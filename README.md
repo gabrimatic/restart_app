@@ -11,7 +11,7 @@
 
 ```yaml
 dependencies:
-  restart_app: ^1.0.0
+  restart_app: ^1.0.3
 ```
 
 **2. Import package:**
