@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:restart_app/restart.dart';
+import 'package:restart_app/restart_app.dart';
 
 void main() {
   const MethodChannel channel = MethodChannel('restart');
