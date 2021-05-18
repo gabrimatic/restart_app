@@ -1,10 +1,15 @@
 
+------------
+
+# 1.0.2
+
+- Bugs fixed.
 
 ------------
 
 # 1.0.1
 
-- Bugs fixed.
+- Package names updated.
 
 ------------
 

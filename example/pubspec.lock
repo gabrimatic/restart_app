@@ -88,13 +88,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.8.0"
-  restart:
+  restart_app:
     dependency: "direct main"
     description:
       path: ".."
       relative: true
     source: path
-    version: "1.0.0"
+    version: "1.0.2"
   sky_engine:
     dependency: transitive
     description: flutter
