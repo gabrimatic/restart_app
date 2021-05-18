@@ -16,7 +16,9 @@ class ExampleApp extends StatelessWidget {
         body: Center(
           child: TextButton(
             child: Text('Restart!'),
-            onPressed: Restart.restartApp,
+            onPressed: () {
+              Restart.restartApp();
+            },
           ),
         ),
       ),
