@@ -1,4 +1,4 @@
-name: restart
+name: restart_app
 description: A simple package that helps you to restart the whole android app with a single function call.
 version: 1.0.0
 author: Hossein Yousefpour <h.yusefpour@gmail.com>
