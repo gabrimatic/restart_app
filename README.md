@@ -10,7 +10,7 @@
 **1.  Add the package to pubspec.yaml dependency:**
 ```yaml
 dependencies:
-  restart: ^1.0.0
+  restart_app: ^1.0.0
 ```
 **2. Import package:**
 ```dart

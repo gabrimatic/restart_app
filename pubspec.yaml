@@ -1,6 +1,6 @@
 name: restart_app
 description: A simple package that helps you to restart the whole android app with a single function call.
-version: 1.0.0
+version: 1.0.1
 author: Hossein Yousefpour <h.yusefpour@gmail.com>
 homepage: https://github.com/gabrimatic/restart
 
