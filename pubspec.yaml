@@ -1,6 +1,6 @@
 name: restart_app
 description: A simple package that helps you to restart the whole android app with a single function call.
-version: 1.0.3
+version: 1.1.0
 homepage: https://github.com/gabrimatic/restart
 
 environment:
@@ -9,6 +9,8 @@ environment:
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_web_plugins:
     sdk: flutter
 
 dev_dependencies:
@@ -21,3 +23,6 @@ flutter:
       android:
         package: gabrimatic.info.restart
         pluginClass: RestartPlugin
+      web:
+        pluginClass: RestartWeb
+        fileName: restart_web.dart

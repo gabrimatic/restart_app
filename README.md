@@ -11,7 +11,7 @@
 
 ```yaml
 dependencies:
-  restart_app: ^1.0.3
+  restart_app: ^1.1.0
 ```
 
 **2. Import package:**
@@ -24,6 +24,7 @@ import 'package:restart_app/restart_app.dart';
 
 ```dart
 onPressed: () {
-    Restart.restartApp();
+  /// Fill webOrigin only when your current origin is different than the app's origin
+  Restart.restartApp(webOrigin: '[your main route]');
 }
 ```
