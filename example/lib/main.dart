@@ -18,7 +18,7 @@ class ExampleApp extends StatelessWidget {
             child: Text('Restart!'),
             onPressed: () {
               /// Fill webOrigin only when your current origin is different than the app's origin
-              Restart.restartApp(webOrigin: '[your main route]');
+              Restart.restartApp();
             },
           ),
         ),

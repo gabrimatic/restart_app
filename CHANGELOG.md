@@ -1,8 +1,8 @@
-### 1.1.0
-
-- Web support added.
-
----
+### 1.1.0 
+ 
+- Web support added. 
+ 
+--- 
 
 ### 1.0.3
 
