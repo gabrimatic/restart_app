@@ -1,12 +1,9 @@
 ### Restart app in Flutter
 
----
 
 *A simple plugin to restart your flutter application WITH NATIVE APIs.*
 
-#### How to use it?
-
----
+## How to use it?
 **1.  Add the package to pubspec.yaml dependency:**
 
 ```yaml
