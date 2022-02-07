@@ -1,4 +1,4 @@
-### Restart app in Flutter
+# Restart app in Flutter
 
 
 *A simple plugin to restart your flutter application WITH NATIVE APIs.*
