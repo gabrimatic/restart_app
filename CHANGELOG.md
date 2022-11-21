@@ -1,3 +1,9 @@
+### 1.1.1
+ 
+- Gradle version updated. 
+ 
+--- 
+
 ### 1.1.0+1
  
 - Updated to Flutter 3.0.0. 
