@@ -1,3 +1,8 @@
+### 1.1.1+1
+ 
+- iOS support description added to Readme.
+ 
+--- 
 ### 1.1.1
  
 - Gradle version updated. 
