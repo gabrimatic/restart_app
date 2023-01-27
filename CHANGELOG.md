@@ -1,3 +1,8 @@
+### 1.1.2
+ 
+- Updated to Flutter 3.7.0
+ 
+--- 
 ### 1.1.1+1
  
 - iOS support description added to Readme.

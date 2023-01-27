@@ -12,7 +12,7 @@ Unfortunately, there is no efficient way to restart a Flutter application using 
 
 ```yaml
 dependencies:
-  restart_app: ^1.1.1
+  restart_app: ^1.1.2
 ```
 
 **2. Import package:**
