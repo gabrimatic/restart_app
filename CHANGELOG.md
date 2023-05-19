@@ -1,3 +1,9 @@
+### 1.1.3
+ 
+- Updated to Flutter 3.10
+- Example files updated
+ 
+--- 
 ### 1.1.2
  
 - Updated to Flutter 3.7.0

@@ -12,7 +12,7 @@ Unfortunately, there is no efficient way to restart a Flutter application using 
 
 ```yaml
 dependencies:
-  restart_app: ^1.1.2
+  restart_app: ^1.1.3
 ```
 
 **2. Import package:**
@@ -32,6 +32,7 @@ onPressed: () {
 
 ## Developer
 By [Hossein Yousefpour](https://gabrimatic.info "Hossein Yousefpour")
+🔗 [pub.dev repo](https://pub.dev/packages/restart_app "pub.dev")
 
 &copy; All rights reserved.
 

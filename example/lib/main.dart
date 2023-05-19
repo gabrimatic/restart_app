@@ -1,11 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:restart_app/restart_app.dart';
+import 'package:url_strategy/url_strategy.dart';
 
 void main() {
-  runApp(ExampleApp());
+  setPathUrlStrategy();
+
+  runApp(MaterialApp(home: const SplashPage()));
 }
 
-class ExampleApp extends StatelessWidget {
+class SplashPage extends StatefulWidget {
+  const SplashPage({super.key});
+
+  @override
+  State<SplashPage> createState() => _SplashPageState();
+}
+
+class _SplashPageState extends State<SplashPage> {
+  @override
+  void initState() {
+    Future.delayed(
+      Duration(milliseconds: 600),
+      () {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => HomePage()),
+          (route) => false,
+        );
+      },
+    );
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(child: FlutterLogo(size: 64)),
+    );
+  }
+}
+
+class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
