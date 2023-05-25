@@ -1,3 +1,8 @@
+### 1.2.0
+ 
+- iOS support added
+ 
+--- 
 ### 1.1.3
  
 - Updated to Flutter 3.10
