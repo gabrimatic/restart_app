@@ -5,7 +5,7 @@ import 'package:url_strategy/url_strategy.dart';
 void main() {
   setPathUrlStrategy();
 
-  runApp(MaterialApp(home: const SplashPage()));
+  runApp(const MaterialApp(home: SplashPage()));
 }
 
 class SplashPage extends StatefulWidget {
@@ -19,11 +19,11 @@ class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     Future.delayed(
-      Duration(milliseconds: 600),
+      const Duration(milliseconds: 600),
       () {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => HomePage()),
+          MaterialPageRoute(builder: (_) => const HomePage()),
           (route) => false,
         );
       },
@@ -33,13 +33,15 @@ class _SplashPageState extends State<SplashPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       body: Center(child: FlutterLogo(size: 64)),
     );
   }
 }
 
 class HomePage extends StatelessWidget {
+  const HomePage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -49,7 +51,7 @@ class HomePage extends StatelessWidget {
         ),
         body: Center(
           child: TextButton(
-            child: Text('Restart!'),
+            child: const Text('Restart!'),
             onPressed: () {
               /// Fill webOrigin only when your new origin is different than the app's origin
               Restart.restartApp();
