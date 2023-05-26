@@ -64,7 +64,6 @@ Add the following to the project /ios/Runner/Info.plist file. This will allow th
 
 ## Developer
 By [Hossein Yousefpour](https://gabrimatic.info "Hossein Yousefpour")
-🔗 [pub.dev repo](https://pub.dev/packages/restart_app "pub.dev")
 
 &copy; All rights reserved.
 
