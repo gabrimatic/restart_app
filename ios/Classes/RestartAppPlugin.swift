@@ -2,65 +2,68 @@ import Flutter
 import UIKit
 import UserNotifications
 
-// Define the plugin class
+/// `RestartAppPlugin` class provides a method to restart a Flutter application in iOS.
+///
+/// It uses the Flutter platform channels to communicate with the Flutter code.
+/// Specifically, it uses a `FlutterMethodChannel` named 'restart' for this communication.
+///
+/// The main functionality is provided by the `handle` method.
 public class RestartAppPlugin: NSObject, FlutterPlugin {
-  // This function is called when the plugin is registered with Flutter
+  /// Registers the plugin with the given `registrar`.
+  ///
+  /// This function is called when the plugin is registered with Flutter.
+  /// It creates a `FlutterMethodChannel` named 'restart', and sets this plugin instance as
+  /// the delegate for method calls from Flutter.
   public static func register(with registrar: FlutterPluginRegistrar) {
-    // Create a FlutterMethodChannel for communicating with Flutter
     let channel = FlutterMethodChannel(name: "restart", binaryMessenger: registrar.messenger())
-    // Create an instance of the plugin
     let instance: RestartAppPlugin = RestartAppPlugin()
-    // Set the plugin instance as the delegate for method calls from Flutter
     registrar.addMethodCallDelegate(instance, channel: channel)
   }
 
-  // This function handles method calls from Flutter
+  /// Handles method calls from the Flutter code.
+  ///
+  /// If the method call is 'restartApp', it requests notification permissions and then sends a
+  /// notification. Finally, it exits the app.
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    // If the method call is "restartApp"
     if call.method == "restartApp" {
-      // Request notification permissions
       self.requestNotificationPermissions { granted in
-        // If permissions are granted, send the notification
         if granted {
           self.sendNotification()
         }
-        // Exit the app
         exit(0)
       }
     }
   }
 
-  // This function requests notification permissions
+  /// Requests notification permissions.
+  ///
+  /// This function gets the current notification center and then requests alert notification
+  /// permissions. If the permissions are granted, or if there's an error, it calls the given
+  /// `completion` handler with the appropriate value.
   private func requestNotificationPermissions(completion: @escaping (Bool) -> Void) {
-    // Get the current notification center
     let current = UNUserNotificationCenter.current()
-    // Request alert notification permissions
     current.requestAuthorization(options: [.alert]) { granted, error in
-      // If there's an error, print it and call the completion handler with false
       if let error = error {
         print("Error requesting notification permissions: \(error)")
         completion(false)
       } else {
-        // Otherwise, call the completion handler with the granted value
         completion(granted)
       }
     }
   }
 
-  // This function sends a notification
+  /// Sends a notification.
+  ///
+  /// This function sets up the notification content and trigger, creates a notification request,
+  /// and then adds the request to the notification center.
   private func sendNotification() {
-    // Set up the notification content
     let content = UNMutableNotificationContent()
     content.title = "Tap to open the app!"
-    // Ensure no sound will be played for this notification
     content.sound = nil
 
-    // Set up the notification trigger
     let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-    // Create the notification request
     let request = UNNotificationRequest(identifier: "RestartApp", content: content, trigger: trigger)
 
-    // Add the notification request to the notification center
     UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
   }
 }

@@ -9,7 +9,7 @@ A simple plugin to restart your Flutter application **With Native APIs**.
 
 ```yaml
 dependencies:
-  restart_app: ^1.2.0
+  restart_app: ^1.2.1
 ```
 
 **2. Import package:**
@@ -39,6 +39,7 @@ It's because there could be a delay in iOS granting notification permissions, es
 To handle the notification permissions earlier and provide context to the user, you can use packages like [permission_handler](https://pub.dev/packages/permission_handler "permission_handler").
 
 **Here's the configuration you need to add:**
+
 Add the following to the project /ios/Runner/Info.plist file. This will allow the app to send local notifications. Replace PRODUCT_BUNDLE_IDENTIFIER and example with your actual bundle identifier and URL scheme:
 
 ```
@@ -59,8 +60,10 @@ Add the following to the project /ios/Runner/Info.plist file. This will allow th
 </array>
 ```
 
-> The CFBundleURLTypes key is used to define URL schemes that your app can handle. URL schemes are used to open your app from another app, a webpage, or even the same app. In this case, it is used to reopen the app from the local notification.The CFBundleURLTypes key is used to define URL schemes that your app can handle. URL schemes are used to open your app from another app, a webpage, or even the same app. In this case, it is used to reopen the app from the local notification.
+> The CFBundleURLTypes key is used to define URL schemes that your app can handle. URL schemes are used to open your app from another app, a webpage, or even the same app. In this case, it is used to reopen the app from the local notification.
 
+## TODO
+- Implement deep linking for smooth app restarts, enabling direct navigation to specific pages upon restart.
 
 ## Developer
 By [Hossein Yousefpour](https://gabrimatic.info "Hossein Yousefpour")

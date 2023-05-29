@@ -46,14 +46,12 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Restart App Example'),
-        ),
+        appBar: AppBar(title: const Text('Restart App Example')),
         body: Center(
           child: TextButton(
             child: const Text('Restart!'),
             onPressed: () {
-              /// Fill webOrigin only when your new origin is different than the app's origin
+              /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
               Restart.restartApp();
             },
           ),
