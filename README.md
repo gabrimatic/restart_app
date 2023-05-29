@@ -1,7 +1,7 @@
 # Restart app in Flutter
 
 
-A simple plugin to restart your Flutter application **With Native APIs**.
+A Flutter plugin that helps you to restart the whole Flutter app with a single function call by using **Native APIs**.
 
 
 ## How to use it?
