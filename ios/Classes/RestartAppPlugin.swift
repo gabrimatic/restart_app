@@ -26,12 +26,21 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
   /// notification. Finally, it exits the app.
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     if call.method == "restartApp" {
-      self.requestNotificationPermissions { granted in
-        if granted {
-          self.sendNotification()
-        }
-        exit(0)
-      }
+        if let arguments = call.arguments as? String,
+           let data = arguments.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+           let iosShowNotification = json["iosShowNotification"] as? Bool,
+               iosShowNotification == true {
+                self.requestNotificationPermissions { granted in
+                  if granted {
+                    self.sendNotification()
+                  }
+                  exit(0)
+                }
+            }else {
+                exit(0)
+            }
+      
     }
   }
 

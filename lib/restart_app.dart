@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ffi';
 
 import 'package:flutter/services.dart';
 
@@ -22,6 +24,13 @@ class Restart {
   /// This method communicates with the platform-specific code to perform the restart operation,
   /// and then checks the response. If the response is "ok", it returns true, signifying that
   /// the restart operation was successful. Otherwise, it returns false.
-  static Future<bool> restartApp({String? webOrigin}) async =>
-      (await _channel.invokeMethod('restartApp', webOrigin)) == "ok";
+  static Future<bool> restartApp(
+      {String? webOrigin, bool? iosShowNotification}) async {
+    final msgObj = {
+      "webOrigin": webOrigin,
+      "iosShowNotification": iosShowNotification
+    };
+    return (await _channel.invokeMethod('restartApp', jsonEncode(msgObj))) ==
+        "ok";
+  }
 }
