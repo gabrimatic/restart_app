@@ -9,7 +9,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.1.2'
+        classpath 'com.android.tools.build:gradle:8.2.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -26,6 +26,8 @@ apply plugin: 'kotlin-android'
 
 android {
     compileSdkVersion 31
+
+    gabrimatic.info.restart
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
