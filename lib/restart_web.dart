@@ -1,13 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
+import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 // In order to *not* need this ignore, consider extracting the "web" version
 // of your plugin as a separate package, instead of inlining it in the same
 // package as the core of your plugin.
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html show window;
-
-import 'package:flutter/services.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart';
+import 'package:web/web.dart' as web show window;
 
 /// `RestartWeb` provides a web implementation of the `Restart` plugin.
 ///
@@ -53,8 +52,8 @@ class RestartWeb {
   /// This method replaces the current location with the given `webOrigin` (or `window.origin` if
   /// `webOrigin` is null), effectively reloading the web app.
   void restart(String? webOrigin) {
-    html.window.location.replace(
-      webOrigin ?? html.window.origin.toString(),
+    web.window.location.replace(
+      webOrigin ?? web.window.origin.toString(),
     );
   }
 }
