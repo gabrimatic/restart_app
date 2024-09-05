@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:restart_app/restart_app.dart';
 import 'package:url_strategy/url_strategy.dart';
@@ -48,7 +50,7 @@ class HomePage extends StatelessWidget {
       home: Scaffold(
         appBar: AppBar(title: const Text('Restart App Example')),
         body: Center(
-          child: TextButton(
+          child: FilledButton(
             child: const Text('Restart!'),
             onPressed: () {
               /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
