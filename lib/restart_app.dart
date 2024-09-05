@@ -19,9 +19,19 @@ class Restart {
   /// to get the site origin. This parameter should only be filled when your current origin
   /// is different than the app's origin. It defaults to null.
   ///
+  /// The `customMessage` parameter is optional. It allows customization of the notification
+  /// message displayed on iOS when restarting the app. If not provided, a default message
+  /// will be used.
+  ///
   /// This method communicates with the platform-specific code to perform the restart operation,
   /// and then checks the response. If the response is "ok", it returns true, signifying that
   /// the restart operation was successful. Otherwise, it returns false.
-  static Future<bool> restartApp({String? webOrigin}) async =>
-      (await _channel.invokeMethod('restartApp', webOrigin)) == "ok";
+  static Future<bool> restartApp(
+      {String? webOrigin, String? customMessage}) async {
+    final Map<String, dynamic> args = {
+      'webOrigin': webOrigin,
+      'customMessage': customMessage,
+    };
+    return (await _channel.invokeMethod('restartApp', args)) == "ok";
+  }
 }

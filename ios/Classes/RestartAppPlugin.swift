@@ -16,7 +16,7 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
   /// the delegate for method calls from Flutter.
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "restart", binaryMessenger: registrar.messenger())
-    let instance: RestartAppPlugin = RestartAppPlugin()
+    let instance = RestartAppPlugin()
     registrar.addMethodCallDelegate(instance, channel: channel)
   }
 
@@ -26,9 +26,12 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
   /// notification. Finally, it exits the app.
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     if call.method == "restartApp" {
+      let args = call.arguments as? [String: Any]
+      let customMessage = args?["customMessage"] as? String ?? "Tap to open the app!"
+      
       self.requestNotificationPermissions { granted in
         if granted {
-          self.sendNotification()
+          self.sendNotification(with: customMessage)
         }
         exit(0)
       }
@@ -56,9 +59,9 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
   ///
   /// This function sets up the notification content and trigger, creates a notification request,
   /// and then adds the request to the notification center.
-  private func sendNotification() {
+  private func sendNotification(with message: String) {
     let content = UNMutableNotificationContent()
-    content.title = "Tap to open the app!"
+    content.title = message
     content.sound = nil
 
     let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
