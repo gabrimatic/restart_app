@@ -9,7 +9,7 @@ A Flutter plugin that helps you to restart the whole Flutter app with a single f
 
 ```yaml
 dependencies:
-  restart_app: ^1.2.1
+  restart_app: ^1.3.0
 ```
 
 **2. Import package:**
@@ -22,8 +22,14 @@ import 'package:restart_app/restart_app.dart';
 
 ```dart
 onPressed: () {
-  /// Fill webOrigin only when your new origin is different than the app's origin
-  Restart.restartApp(webOrigin: '[your main route]');
+	Restart.restartApp(
+		/// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
+		// webOrigin: 'http://example.com',
+
+		// Customizing the notification message only on iOS
+		notificationTitle: 'Restarting App',
+		notificationBody: 'Please tap here to open the app again.',
+	);
 }
 ```
 
@@ -62,8 +68,6 @@ Add the following to the project /ios/Runner/Info.plist file. This will allow th
 
 > The CFBundleURLTypes key is used to define URL schemes that your app can handle. URL schemes are used to open your app from another app, a webpage, or even the same app. In this case, it is used to reopen the app from the local notification.
 
-## TODO
-- Implement deep linking for smooth app restarts, enabling direct navigation to specific pages upon restart.
 
 ## Developer
 By [Hossein Yousefpour](https://gabrimatic.info "Hossein Yousefpour")

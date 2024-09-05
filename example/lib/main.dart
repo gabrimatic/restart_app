@@ -57,7 +57,7 @@ class HomePage extends StatelessWidget {
                 /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
                 // webOrigin: 'http://example.com',
 
-                // Customizing the notification message on iOS
+                // Customizing the notification message only on iOS
                 notificationTitle: 'Restarting App',
                 notificationBody: 'Please tap here to open the app again.',
               );

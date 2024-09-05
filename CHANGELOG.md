@@ -1,6 +1,18 @@
+## 1.3.0
+
+* Custom notification support added for iOS:
+  - `notificationTitle` and `notificationBody` can now be customized.
+* Android improvements:
+  - Added namespace configuration.
+  - Replaced `.exit` method with new, safe `ActivityAware` method.
+  - Updated Kotlin version.
+* Web support enhanced:
+  - Added Wasm support.
+* General updates:
+  - Updated dependencies.
+
 ## 1.2.1
  
-* TODO added to README.
 * In-code documentation added to the source.
 
 ## 1.2.0
