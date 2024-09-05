@@ -13,7 +13,7 @@
 			<string>gabrimatic.info.example</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>example</string>
+				<string>title-is-whatever</string>
 			</array>
 		</dict>
 	</array>

@@ -63,7 +63,7 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
   /// and then adds the request to the notification center.
   private func sendNotification(_ message: String?) {
     let content = UNMutableNotificationContent()
-    content.title = message ?? "Tap to open the app!"
+    content.body = message ?? "Tap to open the app!"
     content.sound = nil
 
     let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)

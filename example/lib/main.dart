@@ -52,7 +52,9 @@ class HomePage extends StatelessWidget {
             child: const Text('Restart!'),
             onPressed: () {
               /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
-              Restart.restartApp();
+              Restart.restartApp(
+                message: "Fail... Restarting...",
+              );
             },
           ),
         ),
