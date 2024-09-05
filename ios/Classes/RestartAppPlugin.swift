@@ -2,71 +2,98 @@ import Flutter
 import UIKit
 import UserNotifications
 
-/// `RestartAppPlugin` class provides a method to restart a Flutter application in iOS.
-///
-/// It uses the Flutter platform channels to communicate with the Flutter code.
-/// Specifically, it uses a `FlutterMethodChannel` named 'restart' for this communication.
-///
-/// The main functionality is provided by the `handle` method.
+/// `RestartAppPlugin` is a Flutter plugin that provides functionality to restart
+/// the iOS app by scheduling a notification and then terminating the app.
+/// This implementation is specific to the iOS platform.
 public class RestartAppPlugin: NSObject, FlutterPlugin {
-  /// Registers the plugin with the given `registrar`.
-  ///
-  /// This function is called when the plugin is registered with Flutter.
-  /// It creates a `FlutterMethodChannel` named 'restart', and sets this plugin instance as
-  /// the delegate for method calls from Flutter.
-  public static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(name: "restart", binaryMessenger: registrar.messenger())
-    let instance = RestartAppPlugin()
-    registrar.addMethodCallDelegate(instance, channel: channel)
-  }
-
-  /// Handles method calls from the Flutter code.
-  ///
-  /// If the method call is 'restartApp', it requests notification permissions and then sends a
-  /// notification. Finally, it exits the app.
-  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    if call.method == "restartApp" {
-      let args = call.arguments as? [String: Any]
-      let customMessage = args?["customMessage"] as? String ?? "Tap to open the app!"
-      
-      self.requestNotificationPermissions { granted in
-        if granted {
-          self.sendNotification(with: customMessage)
+    /// The Flutter method channel used for communication between Dart and native code.
+    static var channel: FlutterMethodChannel?
+    
+    /// Registers this plugin with the Flutter engine.
+    ///
+    /// - Parameter registrar: The plugin registrar for registering plugins.
+    public static func register(with registrar: FlutterPluginRegistrar) {
+        channel = FlutterMethodChannel(name: "restart", binaryMessenger: registrar.messenger())
+        let instance = RestartAppPlugin()
+        registrar.addMethodCallDelegate(instance, channel: channel!)
+    }
+    
+    /// Handles method calls from Flutter.
+    ///
+    /// - Parameters:
+    ///   - call: The method call received from Flutter.
+    ///   - result: A callback to send the result back to Flutter.
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        if call.method == "restartApp" {
+            guard let args = call.arguments as? [String: Any] else {
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments", details: nil))
+                return
+            }
+            
+            let notificationTitle = args["notificationTitle"] as? String ?? "App Restart"
+            let notificationBody = args["notificationBody"] as? String ?? "Tap to reopen the app"
+            
+            requestNotificationPermissions { granted in
+                if granted {
+                    self.scheduleNotification(title: notificationTitle, body: notificationBody) { success in
+                        if success {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                exit(0)
+                            }
+                        } else {
+                            result(FlutterError(code: "NOTIFICATION_FAILED", message: "Failed to schedule notification", details: nil))
+                        }
+                    }
+                } else {
+                    result(FlutterError(code: "PERMISSION_DENIED", message: "Notification permission not granted", details: nil))
+                }
+            }
+            result("Scheduling restart notification...")
+        } else {
+            result(FlutterMethodNotImplemented)
         }
-        exit(0)
-      }
     }
-  }
-
-  /// Requests notification permissions.
-  ///
-  /// This function gets the current notification center and then requests alert notification
-  /// permissions. If the permissions are granted, or if there's an error, it calls the given
-  /// `completion` handler with the appropriate value.
-  private func requestNotificationPermissions(completion: @escaping (Bool) -> Void) {
-    let current = UNUserNotificationCenter.current()
-    current.requestAuthorization(options: [.alert]) { granted, error in
-      if let error = error {
-        print("Error requesting notification permissions: \(error)")
-        completion(false)
-      } else {
-        completion(granted)
-      }
+    
+    /// Requests notification permissions from the user.
+    ///
+    /// - Parameter completion: A closure that is called with a boolean indicating
+    ///   whether notification permissions were granted.
+    private func requestNotificationPermissions(completion: @escaping (Bool) -> Void) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            DispatchQueue.main.async {
+                completion(granted)
+            }
+        }
     }
-  }
-
-  /// Sends a notification.
-  ///
-  /// This function sets up the notification content and trigger, creates a notification request,
-  /// and then adds the request to the notification center.
-  private func sendNotification(with message: String) {
-    let content = UNMutableNotificationContent()
-    content.title = message
-    content.sound = nil
-
-    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-    let request = UNNotificationRequest(identifier: "RestartApp", content: content, trigger: trigger)
-
-    UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
-  }
+    
+    /// Schedules a local notification to appear after the app is terminated.
+    /// This method is specific to iOS and should not be called on other platforms.
+    ///
+    /// - Parameters:
+    ///   - title: The title to display in the notification.
+    ///   - body: The body message to display in the notification.
+    ///   - completion: A closure that is called with a boolean indicating
+    ///     whether the notification was successfully scheduled.
+    private func scheduleNotification(title: String, body: String, completion: @escaping (Bool) -> Void) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = UNNotificationSound.default
+        
+        // Add a custom action to relaunch the app
+        if let bundleIdentifier = Bundle.main.bundleIdentifier {
+            content.userInfo = ["bundleIdentifier": bundleIdentifier]
+            content.categoryIdentifier = "RESTART_CATEGORY"
+        }
+        
+        // Schedule the notification to appear 2 seconds from now
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
+        let request = UNNotificationRequest(identifier: "RestartApp", content: content, trigger: trigger)
+        
+        let notificationCenter = UNUserNotificationCenter.current()
+        notificationCenter.add(request) { error in
+            completion(error == nil)
+        }
+    }
 }

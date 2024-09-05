@@ -53,8 +53,14 @@ class HomePage extends StatelessWidget {
           child: FilledButton(
             child: const Text('Restart!'),
             onPressed: () {
-              /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
-              Restart.restartApp();
+              Restart.restartApp(
+                /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
+                // webOrigin: 'http://example.com',
+
+                // Customizing the notification message on iOS
+                notificationTitle: 'Restarting App',
+                notificationBody: 'Please tap here to open the app again.',
+              );
             },
           ),
         ),

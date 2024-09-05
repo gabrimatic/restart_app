@@ -26,11 +26,15 @@ class Restart {
   /// This method communicates with the platform-specific code to perform the restart operation,
   /// and then checks the response. If the response is "ok", it returns true, signifying that
   /// the restart operation was successful. Otherwise, it returns false.
-  static Future<bool> restartApp(
-      {String? webOrigin, String? customMessage}) async {
+  static Future<bool> restartApp({
+    String? webOrigin,
+    String? notificationTitle,
+    String? notificationBody,
+  }) async {
     final Map<String, dynamic> args = {
       'webOrigin': webOrigin,
-      'customMessage': customMessage,
+      'notificationTitle': notificationTitle,
+      'notificationBody': notificationBody,
     };
     return (await _channel.invokeMethod('restartApp', args)) == "ok";
   }
