@@ -1,3 +1,10 @@
+## 1.3.1
+
+* Updated JVM and Kotlin versions.
+* Upgraded Flutter web dependency to more compatible version
+* Resolved dependency conflicts with firebase packages and restart_app.
+
+
 ## 1.3.0
 
 * Custom notification support added for iOS:

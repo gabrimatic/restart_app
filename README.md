@@ -9,7 +9,7 @@ A Flutter plugin that helps you to restart the whole Flutter app with a single f
 
 ```yaml
 dependencies:
-  restart_app: ^1.3.0
+  restart_app: ^1.3.1
 ```
 
 **2. Import package:**
