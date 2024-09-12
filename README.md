@@ -9,7 +9,7 @@ A Flutter plugin that helps you to restart the whole Flutter app with a single f
 
 ```yaml
 dependencies:
-  restart_app: ^1.3.1
+  restart_app: ^1.3.2
 ```
 
 **2. Import package:**
@@ -18,7 +18,7 @@ dependencies:
 import 'package:restart_app/restart_app.dart';
 ```
 
-**3. Call the restartApp method where ever you want:**
+**3. Call the restartApp method wherever you want:**
 
 ```dart
 onPressed: () {
@@ -26,7 +26,7 @@ onPressed: () {
 		/// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
 		// webOrigin: 'http://example.com',
 
-		// Customizing the notification message only on iOS
+		// Customizing the restart notification message (only needed on iOS)
 		notificationTitle: 'Restarting App',
 		notificationBody: 'Please tap here to open the app again.',
 	);
@@ -37,14 +37,18 @@ onPressed: () {
 In order to restart your Flutter application on iOS, due to the platform's limitations, the app will exit and send a local notification to the user. The user can then tap this notification to reopen the app.
 This is not a full app restart, but it's the **closest workaround possible** on iOS.
 
-Please note, this package requests local notification permissions just before the app restarts. If granted, a notification will be displayed to the user, prompting them to reopen the app. 
+##### Customization:
+You can configure the notification’s title and body by passing the `notificationTitle` and `notificationBody` parameters to the `.restartApp` method. These parameters allow you to customize the content of the local notification triggered upon app exit.
+
+##### Notification Permission:
+RestartApp package requests local notification permissions just before the app restarts. If granted, a notification will be displayed to the user, prompting them to reopen the app. 
 
 While this permission request is handled within the swift code by default, it's recommended that you handle the notification permissions at an earlier point in your app's lifecycle.
-It's because there could be a delay in iOS granting notification permissions, especially if the user needs to manually allow it in their device's settings. Furthermore, if permissions are requested without context, the user might deny them, resulting in a poor user experience. 
+This is because there could be a delay in iOS granting notification permissions, especially if the user needs to manually allow it in their device's settings. Furthermore, if permissions are requested without context, the user might deny them, resulting in a poor user experience. 
 
 To handle the notification permissions earlier and provide context to the user, you can use packages like [permission_handler](https://pub.dev/packages/permission_handler "permission_handler").
 
-**Here's the configuration you need to add:**
+**Here is the configuration you need to add:**
 
 Add the following to the project /ios/Runner/Info.plist file. This will allow the app to send local notifications. Replace PRODUCT_BUNDLE_IDENTIFIER and example with your actual bundle identifier and URL scheme:
 

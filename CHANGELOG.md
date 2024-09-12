@@ -1,3 +1,7 @@
+## 1.3.2
+* Updated web package to the stable version
+
+
 ## 1.3.1
 
 * Updated JVM and Kotlin versions.

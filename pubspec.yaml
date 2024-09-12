@@ -1,6 +1,6 @@
 name: restart_app
 description: A Flutter plugin that helps you to restart the whole Flutter app with a single function call by using native APIs.
-version: 1.3.1
+version: 1.3.2
 repository: https://github.com/gabrimatic/restart_app
 issue_tracker: https://github.com/gabrimatic/restart_app/issues
 
@@ -11,7 +11,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  web: ^0.5.1
+  web: ^1.0.0
   plugin_platform_interface: ^2.1.8
   flutter_web_plugins:
     sdk: flutter
