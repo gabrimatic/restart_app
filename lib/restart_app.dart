@@ -28,14 +28,8 @@ class Restart {
   /// the restart operation was successful. Otherwise, it returns false.
   static Future<bool> restartApp({
     String? webOrigin,
-    String? notificationTitle,
-    String? notificationBody,
   }) async {
-    final Map<String, dynamic> args = {
-      'webOrigin': webOrigin,
-      'notificationTitle': notificationTitle,
-      'notificationBody': notificationBody,
-    };
+    final Map<String, dynamic> args = {'webOrigin': webOrigin};
     return (await _channel.invokeMethod('restartApp', args)) == "ok";
   }
 }

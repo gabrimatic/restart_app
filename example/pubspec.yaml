@@ -16,6 +16,7 @@ dependencies:
   restart_app:
     path: ../
   url_strategy: ^0.3.0
+  flutter_bloc: ^8.1.6
 
   
 
