@@ -1,3 +1,7 @@
+## 1.4.0-beta
+* Updated iOS restart mechanism to use a new native method.
+* Improved the example project.
+
 ## 1.3.2
 * Updated web package to the stable version
 
