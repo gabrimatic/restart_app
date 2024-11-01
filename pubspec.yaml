@@ -31,3 +31,5 @@ flutter:
       web:
         pluginClass: RestartWeb
         fileName: restart_web.dart
+      ohos:
+        pluginClass: RestartPlugin
