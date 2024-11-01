@@ -1,20 +1,6 @@
 {
   "app": {
-    "signingConfigs": [
-      {
-        "name": "default",
-        "type": "HarmonyOS",
-        "material": {
-          "certpath": "/Users/lipiao/.ohos/config/default_ohos_UeaHXNGwpUNRrKQKRikonAEeirc0OVs6hfzDJlqMqis=.cer",
-          "storePassword": "0000001BEAEDE1D94DAF95AAE2B3DA412C5856DF9D4FBE84A05B1F579FD04B1D897F2BE7AC0B718EEFE3C9",
-          "keyAlias": "debugKey",
-          "keyPassword": "0000001BB629245DF28315CCF1EAB6F82ADEF1687C4F6AC4B2213396FA150FEACEAAD3632AC98CA6EFB042",
-          "profile": "/Users/lipiao/.ohos/config/default_ohos_UeaHXNGwpUNRrKQKRikonAEeirc0OVs6hfzDJlqMqis=.p7b",
-          "signAlg": "SHA256withECDSA",
-          "storeFile": "/Users/lipiao/.ohos/config/default_ohos_UeaHXNGwpUNRrKQKRikonAEeirc0OVs6hfzDJlqMqis=.p12"
-        }
-      }
-    ],
+    "signingConfigs": [],
     "products": [
       {
         "name": "default",
