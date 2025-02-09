@@ -47,6 +47,11 @@ android {
     defaultConfig {
         minSdk 16
     }
+
+    if (project.android.hasProperty('namespace')) {
+        namespace 'gabrimatic.info.restart'
+    }
+
 }
 
 dependencies {
