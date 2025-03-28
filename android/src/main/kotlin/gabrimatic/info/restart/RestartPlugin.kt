@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.NonNull
+import com.jakewharton.processphoenix.ProcessPhoenix
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -65,13 +66,15 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      * Restarts the application.
      */
     private fun restartApp() {
-        activity?.let { currentActivity ->
+        /*activity?.let { currentActivity ->
             val intent =
                 currentActivity.packageManager.getLaunchIntentForPackage(currentActivity.packageName)
             intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             currentActivity.startActivity(intent)
             currentActivity.finishAffinity()
-        }
+        }*/
+
+        ProcessPhoenix.triggerRebirth(context);
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
