@@ -20,7 +20,7 @@ import android.os.Looper
  * It uses the Flutter platform channels to communicate with the Flutter code.
  * Specifically, it uses a `MethodChannel` named 'restart' for this communication.
  *
- * Enhanced to ensure a complete process restart to properly apply Shorebird updates.
+ * The main functionality is provided by the `onMethodCall` method.
  */
 class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private lateinit var context: Context
