@@ -90,7 +90,8 @@ class HomePage extends StatelessWidget {
                   Restart.restartApp(
                     forceKill: true,
                     notificationTitle: 'Force Restarting App',
-                    notificationBody: 'App will completely restart for better cleanup.',
+                    notificationBody:
+                        'App will completely restart for better cleanup.',
                   );
                 },
               ),
