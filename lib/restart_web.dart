@@ -32,12 +32,22 @@ class RestartWeb {
 
   /// Handles method calls from the Flutter code.
   ///
-  /// If the method call is 'restartApp', it calls the `restart` method with the given `webOrigin`.
+  /// If the method call is 'restartApp', it calls the `restart` method with the arguments.
   /// Otherwise, it returns 'false' to signify that the method call was not recognized.
   Future<dynamic> handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'restartApp':
-        return restart(call.arguments as String?);
+        // Handle both old single string argument and new Map arguments
+        Map<String, dynamic>? args;
+        if (call.arguments is Map) {
+          args = Map<String, dynamic>.from(call.arguments as Map);
+        } else if (call.arguments is String) {
+          // Backward compatibility for old single string argument
+          args = {'webOrigin': call.arguments as String};
+        } else {
+          args = <String, dynamic>{};
+        }
+        return restart(args);
       default:
         return 'false';
     }
@@ -45,15 +55,57 @@ class RestartWeb {
 
   /// Restarts the web app.
   ///
-  /// The `webOrigin` parameter is optional. If it's null, the method uses the `window.origin`
-  /// to get the site origin. This parameter should only be filled when your current origin
-  /// is different than the app's origin. It defaults to null.
+  /// The `args` map can contain:
+  /// - `webOrigin`: Custom origin URL (optional)
+  /// - `delayBeforeRestart`: Delay in milliseconds before restart (optional)
   ///
-  /// This method replaces the current location with the given `webOrigin` (or `window.origin` if
-  /// `webOrigin` is null), effectively reloading the web app.
-  void restart(String? webOrigin) {
-    web.window.location.replace(
-      webOrigin ?? web.window.origin.toString(),
-    );
+  /// This method handles hash-based routing and properly constructs URLs.
+  /// If webOrigin contains a hash fragment, it will be properly handled.
+  ///
+  /// This method replaces the current location with the given webOrigin or reloads 
+  /// the current page, effectively restarting the web app.
+  String restart(Map<String, dynamic> args) {
+    try {
+      final String? webOrigin = args['webOrigin'] as String?;
+      final int delayBeforeRestart = (args['delayBeforeRestart'] as int?) ?? 0;
+      
+      void performRestart() {
+        String targetUrl;
+        
+        if (webOrigin != null && webOrigin.isNotEmpty) {
+          // Handle hash-based routing
+          if (webOrigin.startsWith('#')) {
+            // If it starts with #, append to current origin
+            targetUrl = '${web.window.origin}/${webOrigin}';
+          } else if (webOrigin.startsWith('/') && !webOrigin.startsWith('//#')) {
+            // Handle relative path that should be hash-based
+            final currentHref = web.window.location.href;
+            if (currentHref.contains('/#/')) {
+              targetUrl = '${web.window.origin}/#${webOrigin}';
+            } else {
+              targetUrl = '${web.window.origin}${webOrigin}';
+            }
+          } else {
+            // Use as provided
+            targetUrl = webOrigin;
+          }
+        } else {
+          // Default to current origin
+          targetUrl = web.window.origin;
+        }
+        
+        web.window.location.replace(targetUrl);
+      }
+      
+      if (delayBeforeRestart > 0) {
+        Future.delayed(Duration(milliseconds: delayBeforeRestart), performRestart);
+      } else {
+        performRestart();
+      }
+      
+      return 'ok';
+    } catch (e) {
+      return 'error: $e';
+    }
   }
 }

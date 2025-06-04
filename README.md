@@ -9,7 +9,7 @@ A Flutter plugin that helps you to restart the whole Flutter app with a single f
 
 ```yaml
 dependencies:
-  restart_app: ^1.3.2
+  restart_app: ^1.4.0
 ```
 
 **2. Import package:**
@@ -29,8 +29,52 @@ onPressed: () {
 		// Customizing the restart notification message (only needed on iOS)
 		notificationTitle: 'Restarting App',
 		notificationBody: 'Please tap here to open the app again.',
+		
+		// Optional: Add delay before restart (in milliseconds)
+		delayBeforeRestart: 1000, // 1 second delay
+		
+		// Optional: Force complete app termination for better cleanup (Android only)
+		forceKill: false,
 	);
 }
+```
+
+## New in v1.4.0
+
+### Enhanced Parameters
+
+The `restartApp()` method now supports additional optional parameters:
+
+- **`delayBeforeRestart`** (int): Delay in milliseconds before the restart occurs. Useful for cleanup operations or showing user feedback.
+- **`forceKill`** (bool): Forces complete process termination on Android for better cleanup of resources like device connections.
+
+### Web Platform Improvements
+
+- **Hash URL Strategy Support**: Properly handles single-page applications with hash-based routing
+- **Better Error Handling**: Fixed type casting issues and improved error messages
+
+### Usage Examples
+
+```dart
+// Standard restart
+Restart.restartApp();
+
+// Restart with delay
+Restart.restartApp(delayBeforeRestart: 2000);
+
+// Force kill restart (Android) - useful for device connection cleanup
+Restart.restartApp(forceKill: true);
+
+// Web with hash routing
+Restart.restartApp(webOrigin: '#/home');
+
+// Combined parameters
+Restart.restartApp(
+  delayBeforeRestart: 1500,
+  forceKill: true,
+  notificationTitle: 'App Restarting',
+  notificationBody: 'Please wait while we restart the app...',
+);
 ```
 
 ## iOS Platform Config
