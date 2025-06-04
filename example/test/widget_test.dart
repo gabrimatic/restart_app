@@ -13,8 +13,8 @@ void main() {
     // Wait for the navigation to HomePage
     await tester.pumpAndSettle(const Duration(milliseconds: 600));
 
-    // Verify that the HomePage is displayed
-    expect(find.text('Restart App Example'), findsOneWidget);
+    // Verify that the HomePage is displayed (check for app bar title specifically)
+    expect(find.text('Restart App Example').first, findsOneWidget);
   });
 
   testWidgets('HomePage displays the Restart button',
@@ -22,7 +22,10 @@ void main() {
     // Build the HomePage widget
     await tester.pumpWidget(const MaterialApp(home: HomePage()));
 
-    // Verify that the HomePage contains the Restart button
-    expect(find.text('Restart!'), findsOneWidget);
+    // Verify that the HomePage contains restart buttons
+    expect(find.text('Standard Restart'), findsOneWidget);
+    expect(find.text('Restart with Delay (2s)'), findsOneWidget);
+    expect(find.text('Force Kill Restart'), findsOneWidget);
+    expect(find.text('Hash URL Test (Web)'), findsOneWidget);
   });
 }

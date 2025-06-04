@@ -50,18 +50,60 @@ class HomePage extends StatelessWidget {
       home: Scaffold(
         appBar: AppBar(title: const Text('Restart App Example')),
         body: Center(
-          child: FilledButton(
-            child: const Text('Restart!'),
-            onPressed: () {
-              Restart.restartApp(
-                /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
-                // webOrigin: 'http://example.com',
-
-                // Customizing the notification message only on iOS
-                notificationTitle: 'Restarting App',
-                notificationBody: 'Please tap here to open the app again.',
-              );
-            },
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Restart App Example',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Choose restart type:',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 30),
+              FilledButton(
+                child: const Text('Standard Restart'),
+                onPressed: () {
+                  Restart.restartApp(
+                    notificationTitle: 'Restarting App',
+                    notificationBody: 'Please tap here to open the app again.',
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              FilledButton(
+                child: const Text('Restart with Delay (2s)'),
+                onPressed: () {
+                  Restart.restartApp(
+                    delayBeforeRestart: 2000,
+                    notificationTitle: 'Restarting in 2 seconds',
+                    notificationBody: 'App will restart shortly...',
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              FilledButton(
+                child: const Text('Force Kill Restart'),
+                onPressed: () {
+                  Restart.restartApp(
+                    forceKill: true,
+                    notificationTitle: 'Force Restarting App',
+                    notificationBody: 'App will completely restart for better cleanup.',
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              FilledButton(
+                child: const Text('Hash URL Test (Web)'),
+                onPressed: () {
+                  Restart.restartApp(
+                    webOrigin: '#/test-route',
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
