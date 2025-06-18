@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
-import androidx.annotation.NonNull
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -34,7 +33,7 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      * It initializes the `context` with the application context and
      * sets this plugin instance as the handler for method calls from Flutter.
      */
-    override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+    override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         context = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "restart")
         channel.setMethodCallHandler(this)
@@ -46,12 +45,12 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      * If the method call is 'restartApp', it restarts the app and sends a successful result.
      * For any other method call, it sends a 'not implemented' result.
      */
-    override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
+    override fun onMethodCall(call: MethodCall, result: Result) {
         if (call.method == "restartApp") {
             val args = call.arguments as? Map<String, Any> ?: mapOf()
             val delayBeforeRestart = (args["delayBeforeRestart"] as? Int) ?: 0
             val forceKill = (args["forceKill"] as? Boolean) ?: false
-            
+
             restartApp(delayBeforeRestart, forceKill)
             result.success("ok")
         } else {
@@ -64,30 +63,31 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      *
      * It removes the handler for method calls from Flutter.
      */
-    override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
     }
 
     /**
      * Restarts the application.
-     * 
+     *
      * @param delayBeforeRestart Delay in milliseconds before restarting
      * @param forceKill Whether to force kill the process (for better cleanup)
      */
     private fun restartApp(delayBeforeRestart: Int = 0, forceKill: Boolean = false) {
         val currentActivity = activity ?: return
-        
-        val restartAction = {
+
+        val restartAction: () -> Unit = {
             try {
-                val intent = currentActivity.packageManager.getLaunchIntentForPackage(currentActivity.packageName)
+                val intent =
+                    currentActivity.packageManager.getLaunchIntentForPackage(currentActivity.packageName)
                 intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                
+
                 if (forceKill) {
                     // Use the older behavior that forces a complete process restart
                     // This helps with cleanup issues like Android Open Accessory connections
                     currentActivity.startActivity(intent)
                     currentActivity.finishAffinity()
-                    
+
                     // Force exit the process after a small delay to ensure cleanup
                     Handler(Looper.getMainLooper()).postDelayed({
                         exitProcess(0)
@@ -103,7 +103,7 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 exitProcess(0)
             }
         }
-        
+
         if (delayBeforeRestart > 0) {
             Handler(Looper.getMainLooper()).postDelayed(restartAction, delayBeforeRestart.toLong())
         } else {
