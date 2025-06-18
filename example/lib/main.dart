@@ -1,5 +1,3 @@
-// ignore_for_file: use_build_context_synchronously
-
 import 'package:flutter/material.dart';
 import 'package:restart_app/restart_app.dart';
 import 'package:url_strategy/url_strategy.dart';
@@ -20,17 +18,15 @@ class SplashPage extends StatefulWidget {
 class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
-    Future.delayed(
-      const Duration(milliseconds: 600),
-      () {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false,
-        );
-      },
-    );
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final nav = Navigator.of(context);
+      await Future.delayed(const Duration(milliseconds: 600));
+      nav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
+      );
+    });
   }
 
   @override
