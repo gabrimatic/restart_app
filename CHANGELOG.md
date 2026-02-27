@@ -1,3 +1,9 @@
+## 1.5.2
+
+* Fixed Android FlutterJNI detached error: all destructive restart operations are now deferred via a short delay so the platform channel result can be delivered to the Dart side before the Flutter engine is torn down
+* Lowered minimum Dart SDK requirement from 3.5.1 to 3.4.0 (Flutter 3.22+)
+* Improved README: corrected iOS provisioning profile guidance, removed inaccurate CFBundleURLTypes instructions, and added documentation for calling from background isolates
+
 ## 1.5.1
 
 * Added `forceKill` option for Android — fully terminates the process after restart for a clean cold start

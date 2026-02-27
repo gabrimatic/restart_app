@@ -43,8 +43,14 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      * Handles method calls from the Flutter code.
      *
      * If the method call is 'restartApp', it restarts the app and sends a successful result.
-     * When forceKill is true, the current process is terminated after the new activity starts,
-     * ensuring a full cold restart with no stale native resource locks.
+     * The result is sent before the restart is triggered so the Flutter engine has time to
+     * deliver it across the platform channel. Without this delay, finishAffinity() can tear
+     * down the engine mid-delivery, causing a FlutterJNI detached error.
+     *
+     * When forceKill is true, the process is terminated immediately after the new activity
+     * launches, ensuring a clean cold restart with no stale native resources. A longer delay
+     * gives the new activity time to initialize before the current process exits.
+     *
      * For any other method call, it sends a 'not implemented' result.
      */
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
@@ -60,15 +66,18 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
             result.success("ok")
 
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            currentActivity.startActivity(intent)
-            currentActivity.finishAffinity()
-
-            if (forceKill) {
-                Handler(Looper.getMainLooper()).postDelayed({
+            // Delay the destructive operations so the platform channel result can be delivered
+            // to the Dart side before the Flutter engine is torn down.
+            val delay = if (forceKill) 300L else 100L
+            Handler(Looper.getMainLooper()).postDelayed({
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                currentActivity.startActivity(intent)
+                if (forceKill) {
                     Runtime.getRuntime().exit(0)
-                }, 200)
-            }
+                } else {
+                    currentActivity.finishAffinity()
+                }
+            }, delay)
         } else {
             result.notImplemented()
         }

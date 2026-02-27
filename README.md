@@ -9,7 +9,7 @@ A Flutter plugin that helps you to restart the whole Flutter app with a single f
 
 ```yaml
 dependencies:
-  restart_app: ^1.5.1
+  restart_app: ^1.5.2
 ```
 
 **2. Import package:**
@@ -36,45 +36,78 @@ onPressed: () {
 }
 ```
 
-## iOS Platform Config
-In order to restart your Flutter application on iOS, due to the platform's limitations, the app will exit and send a local notification to the user. The user can then tap this notification to reopen the app.
-This is not a full app restart, but it's the **closest workaround possible** on iOS.
+## iOS Platform Notes
 
-##### Customization:
-You can configure the notification’s title and body by passing the `notificationTitle` and `notificationBody` parameters to the `.restartApp` method. These parameters allow you to customize the content of the local notification triggered upon app exit.
+On iOS, apps cannot restart themselves programmatically due to platform sandboxing. When `restartApp()` is called, the plugin schedules a local notification and then exits the app via `exit(0)`. The user taps the notification to reopen the app.
 
-##### Notification Permission:
-RestartApp package requests local notification permissions just before the app restarts. If granted, a notification will be displayed to the user, prompting them to reopen the app. 
+This is the closest possible workaround on iOS. It is not a fully automatic restart.
 
-While this permission request is handled within the swift code by default, it's recommended that you handle the notification permissions at an earlier point in your app's lifecycle.
-This is because there could be a delay in iOS granting notification permissions, especially if the user needs to manually allow it in their device's settings. Furthermore, if permissions are requested without context, the user might deny them, resulting in a poor user experience. 
+#### Notification content
 
-To handle the notification permissions earlier and provide context to the user, you can use packages like [permission_handler](https://pub.dev/packages/permission_handler "permission_handler").
+Customize the notification shown to the user with `notificationTitle` and `notificationBody`:
 
-**Here is the configuration you need to add:**
-
-Add the following to the project /ios/Runner/Info.plist file. This will allow the app to send local notifications. Replace PRODUCT_BUNDLE_IDENTIFIER and example with your actual bundle identifier and URL scheme:
-
-```
-<key>CFBundleURLTypes</key>
-<array>
-  <dict>
-    <key>CFBundleTypeRole</key>
-    <string>Editor</string>
-    <key>CFBundleURLName</key>
-	<!-- You can find it on /ios/project.pbxproj - 'PRODUCT_BUNDLE_IDENTIFIER' -->
-    <string>[Your project PRODUCT_BUNDLE_IDENTIFIER value]</string>
-    <key>CFBundleURLSchemes</key>
-    <array>
-      <!-- Your app title -->
-      <string>example</string>
-    </array>
-  </dict>
-</array>
+```dart
+Restart.restartApp(
+  notificationTitle: 'Update applied',
+  notificationBody: 'Tap to reopen the app.',
+);
 ```
 
-> The CFBundleURLTypes key is used to define URL schemes that your app can handle. URL schemes are used to open your app from another app, a webpage, or even the same app. In this case, it is used to reopen the app from the local notification.
+#### Notification permission
 
+The plugin requests notification permission immediately before restarting. If the user has not yet granted permission, iOS will show the system permission prompt at that moment, which can feel abrupt and may result in a denial.
+
+It is strongly recommended to request notification permission earlier in your app's lifecycle, with appropriate context, so it is already granted when `restartApp()` is called. The [permission_handler](https://pub.dev/packages/permission_handler) package can help with this.
+
+If the user has denied notification permission, `restartApp()` throws a `PlatformException` with code `NOTIFICATION_DENIED`. Handle this in your code:
+
+```dart
+try {
+  await Restart.restartApp();
+} on PlatformException catch (e) {
+  if (e.code == 'NOTIFICATION_DENIED') {
+    // Prompt the user to enable notifications in Settings
+  }
+}
+```
+
+#### IPA build and provisioning profiles
+
+`restart_app` uses **local notifications only** and does not require the Push Notifications capability. It does not add any push-related entitlements to your app.
+
+If you see the error `"requires a provisioning profile with the Push Notifications feature"` when exporting an IPA, this is caused by another dependency in your project, most commonly `firebase_messaging`, which requires push notification entitlements. The fix is to ensure your distribution provisioning profile includes the Push Notifications capability. This is unrelated to `restart_app`.
+
+## Calling from a background isolate
+
+`Restart.restartApp()` uses a platform channel and must be called from the **main isolate**. Calling it directly from a background isolate will throw:
+
+```
+Bad state: The BackgroundIsolateBinaryMessenger.instance value is invalid
+until BackgroundIsolateBinaryMessenger.ensureInitialized is executed.
+```
+
+The recommended pattern is to send a message from your isolate to the main isolate and call `restartApp()` there:
+
+```dart
+// In your main isolate, set up a ReceivePort to listen for restart signals:
+final receivePort = ReceivePort();
+receivePort.listen((message) {
+  if (message == 'restart') {
+    Restart.restartApp();
+  }
+});
+
+// Pass the SendPort to your isolate:
+await Isolate.spawn(myIsolateFunction, receivePort.sendPort);
+
+// In your isolate, send the signal instead of calling restartApp() directly:
+void myIsolateFunction(SendPort sendPort) {
+  // ... your background work ...
+  sendPort.send('restart');
+}
+```
+
+If you need to call platform channels directly from a background isolate for other reasons, you can initialize `BackgroundIsolateBinaryMessenger` first, but the `SendPort` pattern above is simpler and more reliable.
 
 ## Developer
 Created by [Soroush Yousefpour](https://gabrimatic.info)
