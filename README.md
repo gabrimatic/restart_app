@@ -1,50 +1,49 @@
-# Restart app in Flutter
+# restart_app
 
+[![pub package](https://img.shields.io/pub/v/restart_app.svg)](https://pub.dev/packages/restart_app) [![likes](https://img.shields.io/pub/likes/restart_app)](https://pub.dev/packages/restart_app/score) [![popularity](https://img.shields.io/pub/popularity/restart_app)](https://pub.dev/packages/restart_app/score) [![pub points](https://img.shields.io/pub/points/restart_app)](https://pub.dev/packages/restart_app/score)
 
-A Flutter plugin that helps you to restart the whole Flutter app with a single function call by using **Native APIs**.
+Restart your Flutter app with a single function call. Works on Android, iOS, web, and macOS using native APIs on each platform.
 
+## Quick start
 
-## How to use it?
-**1.  Add the package to pubspec.yaml dependency:**
+Add the dependency:
 
 ```yaml
 dependencies:
-  restart_app: ^1.5.2
+  restart_app: ^1.6.0
 ```
 
-**2. Import package:**
+Import and call:
 
 ```dart
 import 'package:restart_app/restart_app.dart';
+
+Restart.restartApp();
 ```
 
-**3. Call the restartApp method wherever you want:**
+## Parameters
 
-```dart
-onPressed: () {
-	Restart.restartApp(
-		/// Web: fill webOrigin only when your new origin differs from the app's origin
-		// webOrigin: 'http://example.com',
+| Parameter | Platform | Description |
+|-----------|----------|-------------|
+| `webOrigin` | Web | Custom origin URL for the reload. Defaults to `window.origin`. Supports hash strategy (e.g. `'#/home'`). |
+| `notificationTitle` | iOS | Title of the local notification shown after exit. |
+| `notificationBody` | iOS | Body of the local notification shown after exit. |
+| `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. |
 
-		/// iOS: customize the local notification shown after the app exits
-		notificationTitle: 'Restarting App',
-		notificationBody: 'Please tap here to open the app again.',
+## Platform behavior
 
-		/// Android: set to true for a full cold restart (kills the process)
-		// forceKill: true,
-	);
-}
-```
+| Platform | Mechanism |
+|----------|-----------|
+| **Android** | Relaunches the main activity via `PackageManager`. With `forceKill: true`, kills the process after launch for a clean cold start. |
+| **iOS** | Schedules a local notification, then exits via `exit(0)`. Tap the notification to reopen. Not a fully automatic restart. |
+| **Web** | Reloads the page using `window.location`. |
+| **macOS** | Launches a new instance via `NSWorkspace` and terminates the current process. Fully automatic. |
 
-## iOS Platform Notes
+## iOS
 
-On iOS, apps cannot restart themselves programmatically due to platform sandboxing. When `restartApp()` is called, the plugin schedules a local notification and then exits the app via `exit(0)`. The user taps the notification to reopen the app.
+### Notification content
 
-This is the closest possible workaround on iOS. It is not a fully automatic restart.
-
-#### Notification content
-
-Customize the notification shown to the user with `notificationTitle` and `notificationBody`:
+Customize what's shown after the app exits:
 
 ```dart
 Restart.restartApp(
@@ -53,13 +52,13 @@ Restart.restartApp(
 );
 ```
 
-#### Notification permission
+### Notification permission
 
-The plugin requests notification permission immediately before restarting. If the user has not yet granted permission, iOS will show the system permission prompt at that moment, which can feel abrupt and may result in a denial.
+The plugin requests notification permission at the moment of restart. If not already granted, iOS shows the system prompt right before exit, which feels abrupt.
 
-It is strongly recommended to request notification permission earlier in your app's lifecycle, with appropriate context, so it is already granted when `restartApp()` is called. The [permission_handler](https://pub.dev/packages/permission_handler) package can help with this.
+Request permission earlier in your app's lifecycle. The [permission_handler](https://pub.dev/packages/permission_handler) package works well for this.
 
-If the user has denied notification permission, `restartApp()` throws a `PlatformException` with code `NOTIFICATION_DENIED`. Handle this in your code:
+If notification permission has been denied, `restartApp()` throws a `PlatformException` with code `NOTIFICATION_DENIED`:
 
 ```dart
 try {
@@ -71,25 +70,25 @@ try {
 }
 ```
 
-#### IPA build and provisioning profiles
+### Provisioning profiles
 
-`restart_app` uses **local notifications only** and does not require the Push Notifications capability. It does not add any push-related entitlements to your app.
+`restart_app` uses **local notifications only**, not push notifications. It adds no push-related entitlements to your app.
 
-If you see the error `"requires a provisioning profile with the Push Notifications feature"` when exporting an IPA, this is caused by another dependency in your project, most commonly `firebase_messaging`, which requires push notification entitlements. The fix is to ensure your distribution provisioning profile includes the Push Notifications capability. This is unrelated to `restart_app`.
+If you see `"requires a provisioning profile with the Push Notifications feature"` when exporting an IPA, another dependency is the cause (commonly `firebase_messaging`). Add the Push Notifications capability to your distribution provisioning profile.
 
-## Calling from a background isolate
+## Background isolates
 
-`Restart.restartApp()` uses a platform channel and must be called from the **main isolate**. Calling it directly from a background isolate will throw:
+`Restart.restartApp()` uses a platform channel and must run on the **main isolate**. Calling it from a background isolate throws:
 
 ```
 Bad state: The BackgroundIsolateBinaryMessenger.instance value is invalid
 until BackgroundIsolateBinaryMessenger.ensureInitialized is executed.
 ```
 
-The recommended pattern is to send a message from your isolate to the main isolate and call `restartApp()` there:
+Send a message from your isolate to the main isolate instead:
 
 ```dart
-// In your main isolate, set up a ReceivePort to listen for restart signals:
+// Main isolate: listen for restart signals
 final receivePort = ReceivePort();
 receivePort.listen((message) {
   if (message == 'restart') {
@@ -97,22 +96,22 @@ receivePort.listen((message) {
   }
 });
 
-// Pass the SendPort to your isolate:
+// Spawn the isolate with the SendPort
 await Isolate.spawn(myIsolateFunction, receivePort.sendPort);
 
-// In your isolate, send the signal instead of calling restartApp() directly:
+// Background isolate: signal instead of calling restartApp() directly
 void myIsolateFunction(SendPort sendPort) {
   // ... your background work ...
   sendPort.send('restart');
 }
 ```
 
-If you need to call platform channels directly from a background isolate for other reasons, you can initialize `BackgroundIsolateBinaryMessenger` first, but the `SendPort` pattern above is simpler and more reliable.
+## Requirements
 
-## Developer
+**Dart SDK:** `>=3.4.0` · **Flutter:** `>=3.22.0`
+
+## Author
+
 Created by [Soroush Yousefpour](https://gabrimatic.info)
 
-&copy; All rights reserved.
-
-## Donate
 <a href="https://www.buymeacoffee.com/gabrimatic" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Book" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>

@@ -71,7 +71,11 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             val delay = if (forceKill) 300L else 100L
             Handler(Looper.getMainLooper()).postDelayed({
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                currentActivity.startActivity(intent)
+                try {
+                    currentActivity.startActivity(intent)
+                } catch (e: Exception) {
+                    return@postDelayed
+                }
                 if (forceKill) {
                     Runtime.getRuntime().exit(0)
                 } else {

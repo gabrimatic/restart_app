@@ -19,20 +19,18 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
                 DispatchQueue.main.async {
                     switch settings.authorizationStatus {
                     case .authorized, .provisional, .ephemeral:
-                        self.scheduleNotification(title: title, body: body)
-                        result("ok")
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            exit(0)
-                        }
+                        self.scheduleAndExit(title: title, body: body, result: result)
                     case .notDetermined:
-                        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
                             DispatchQueue.main.async {
-                                if granted {
-                                    self.scheduleNotification(title: title, body: body)
-                                    result("ok")
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        exit(0)
-                                    }
+                                if let error = error {
+                                    result(FlutterError(
+                                        code: "AUTHORIZATION_ERROR",
+                                        message: "Failed to request notification permission: \(error.localizedDescription)",
+                                        details: nil
+                                    ))
+                                } else if granted {
+                                    self.scheduleAndExit(title: title, body: body, result: result)
                                 } else {
                                     result(FlutterError(
                                         code: "NOTIFICATION_DENIED",
@@ -56,7 +54,7 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    private func scheduleNotification(title: String, body: String) {
+    private func scheduleAndExit(title: String, body: String, result: @escaping FlutterResult) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -64,9 +62,21 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: "restart_app", content: content, trigger: trigger)
+
         UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("[restart_app] Failed to schedule notification: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                if let error = error {
+                    result(FlutterError(
+                        code: "NOTIFICATION_FAILED",
+                        message: "Failed to schedule restart notification: \(error.localizedDescription)",
+                        details: nil
+                    ))
+                } else {
+                    result("ok")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        exit(0)
+                    }
+                }
             }
         }
     }

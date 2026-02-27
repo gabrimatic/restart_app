@@ -1,3 +1,7 @@
+## 1.6.0
+
+* Added native macOS support via a Swift plugin — restarts the app by launching a new instance using `NSWorkspace` and terminating the current process
+
 ## 1.5.2
 
 * Fixed Android FlutterJNI detached error: all destructive restart operations are now deferred via a short delay so the platform channel result can be delivered to the Dart side before the Flutter engine is torn down
@@ -24,74 +28,73 @@
 * Fixed iOS `restartApp()` always returning false ([#48](https://github.com/gabrimatic/restart_app/issues/48))
 
 ## 1.3.2
-* Updated web package to the stable version
 
+* Updated web package to the stable version
 
 ## 1.3.1
 
-* Updated JVM and Kotlin versions.
+* Updated JVM and Kotlin versions
 * Upgraded Flutter web dependency to more compatible version
-* Resolved dependency conflicts with firebase packages and restart_app.
-
+* Resolved dependency conflicts with firebase packages and restart_app
 
 ## 1.3.0
 
 * Custom notification support added for iOS:
-  - `notificationTitle` and `notificationBody` can now be customized.
+  - `notificationTitle` and `notificationBody` can now be customized
 * Android improvements:
-  - Added namespace configuration.
-  - Replaced `.exit` method with new, safe `ActivityAware` method.
-  - Updated Kotlin version.
+  - Added namespace configuration
+  - Replaced `.exit` method with new, safe `ActivityAware` method
+  - Updated Kotlin version
 * Web support enhanced:
-  - Added Wasm support.
+  - Added Wasm support
 * General updates:
-  - Updated dependencies.
+  - Updated dependencies
 
 ## 1.2.1
- 
-* In-code documentation added to the source.
+
+* In-code documentation added to the source
 
 ## 1.2.0
- 
-* iOS support added.
- 
+
+* iOS support added
+
 ## 1.1.3
- 
-* Updated to Flutter 3.10.
-* Example files updated.
- 
+
+* Updated to Flutter 3.10
+* Example files updated
+
 ## 1.1.2
- 
-* Updated to Flutter 3.7.0.
- 
+
+* Updated to Flutter 3.7.0
+
 ## 1.1.1+1
- 
-* iOS support description added to README.
+
+* iOS support description added to README
 
 ## 1.1.1
- 
-* Gradle version updated. 
+
+* Gradle version updated
 
 ## 1.1.0+1
- 
-* Updated to Flutter 3.0.0. 
 
-## 1.1.0 
- 
-* Web support added.
+* Updated to Flutter 3.0.0
+
+## 1.1.0
+
+* Web support added
 
 ## 1.0.3
 
-* Plugin version updated in README.
+* Plugin version updated in README
 
 ## 1.0.2
 
-* Package name updated in example files.
+* Package name updated in example files
 
 ## 1.0.1
 
-* Package name updated.
+* Package name updated
 
 ## 1.0.0
 
-* Null-Safety support added.
+* Null-Safety support added

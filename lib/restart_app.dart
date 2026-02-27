@@ -18,9 +18,12 @@ class Restart {
   /// differs from the app's origin. Supports hash URL strategy (e.g. `'#/home'`).
   ///
   /// The [notificationTitle] and [notificationBody] parameters are iOS-only.
-  /// On iOS, the app terminates and a local notification is shown to let the
-  /// user reopen it. These parameters customize that notification's content.
-  /// Notification permission must be granted before calling this method on iOS.
+  /// On iOS, the app terminates via `exit(0)` and a local notification is shown
+  /// to let the user reopen it. These parameters customize that notification's
+  /// content. Notification permission must be granted before calling this method
+  /// on iOS. Note: Apple's App Store guidelines prohibit calling `exit()` in
+  /// most circumstances; use this on iOS only when the tradeoff is acceptable
+  /// for your use case.
   ///
   /// The [forceKill] parameter is Android-only. When true, the old process is
   /// fully terminated after the new activity starts, preventing stale native
@@ -39,6 +42,6 @@ class Restart {
       'notificationBody': notificationBody,
       'forceKill': forceKill,
     };
-    return (await _channel.invokeMethod('restartApp', args)) == "ok";
+    return (await _channel.invokeMethod('restartApp', args)) == 'ok';
   }
 }

@@ -55,15 +55,30 @@ class RestartWeb {
   /// This method replaces the current location with the given `webOrigin` (or `window.origin` if
   /// `webOrigin` is null), effectively reloading the web app.
   String restart(String? webOrigin) {
-    final origin = (webOrigin != null && webOrigin.isNotEmpty) ? webOrigin : null;
-    if (origin != null && origin.startsWith('#')) {
-      web.window.location.hash = origin;
-      web.window.location.reload();
-    } else {
-      web.window.location.replace(
-        origin ?? web.window.origin.toString(),
+    try {
+      final origin =
+          (webOrigin != null && webOrigin.isNotEmpty) ? webOrigin : null;
+      if (origin != null && origin.startsWith('#')) {
+        web.window.location.hash = origin;
+        web.window.location.reload();
+      } else if (origin != null) {
+        web.window.location.replace(origin);
+      } else {
+        // window.origin returns the literal string "null" in sandboxed iframes,
+        // so we avoid passing it to replace() and fall back to a simple reload.
+        final windowOrigin = web.window.origin.toString();
+        if (windowOrigin.isNotEmpty && windowOrigin != 'null') {
+          web.window.location.replace(windowOrigin);
+        } else {
+          web.window.location.reload();
+        }
+      }
+      return 'ok';
+    } catch (e) {
+      throw PlatformException(
+        code: 'RESTART_FAILED',
+        message: 'Failed to reload the page: $e',
       );
     }
-    return 'ok';
   }
 }

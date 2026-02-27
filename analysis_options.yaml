@@ -1,0 +1,12 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    - always_use_package_imports
+    - avoid_dynamic_calls
+    - avoid_void_async
+    - cancel_subscriptions
+    - close_sinks
+    - prefer_single_quotes
+    - sort_pub_dependencies
+    - unawaited_futures
