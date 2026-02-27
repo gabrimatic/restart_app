@@ -28,6 +28,7 @@ jobs:
         with:
           channel: stable
           cache: true
+      - run: flutter pub get
       - run: dart format --set-exit-if-changed lib/
 
   test:
