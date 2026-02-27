@@ -1,3 +1,15 @@
+## 1.5.1
+
+* Added `forceKill` option for Android — fully terminates the process after restart for a clean cold start
+* Fixed iOS restart not working due to incorrect AppDelegate cast
+* Implemented proper iOS restart using local notifications with permission handling
+* **Breaking (iOS):** Returns a `PlatformException` with code `NOTIFICATION_DENIED` if notification permission is denied — handle this in your code
+* Removed unused `plugin_platform_interface` dependency
+* Fixed iOS podspec placeholder metadata
+* Fixed nested MaterialApp in example app
+* Improved web error handling for unrecognized method calls
+* Cleaned up unused imports
+
 ## 1.3.3
 
 * Fixed web platform crash caused by argument type mismatch ([#35](https://github.com/gabrimatic/restart_app/issues/35), [#51](https://github.com/gabrimatic/restart_app/issues/51))

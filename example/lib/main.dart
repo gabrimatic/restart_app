@@ -46,23 +46,21 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Restart App Example')),
-        body: Center(
-          child: FilledButton(
-            child: const Text('Restart!'),
-            onPressed: () {
-              Restart.restartApp(
-                /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
-                // webOrigin: 'http://example.com',
+    return Scaffold(
+      appBar: AppBar(title: const Text('Restart App Example')),
+      body: Center(
+        child: FilledButton(
+          child: const Text('Restart!'),
+          onPressed: () {
+            Restart.restartApp(
+              /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
+              // webOrigin: 'http://example.com',
 
-                // Customizing the notification message only on iOS
-                notificationTitle: 'Restarting App',
-                notificationBody: 'Please tap here to open the app again.',
-              );
-            },
-          ),
+              // Customizing the notification message only on iOS
+              notificationTitle: 'Restarting App',
+              notificationBody: 'Please tap here to open the app again.',
+            );
+          },
         ),
       ),
     );

@@ -9,7 +9,7 @@ A Flutter plugin that helps you to restart the whole Flutter app with a single f
 
 ```yaml
 dependencies:
-  restart_app: ^1.3.2
+  restart_app: ^1.5.1
 ```
 
 **2. Import package:**
@@ -23,12 +23,15 @@ import 'package:restart_app/restart_app.dart';
 ```dart
 onPressed: () {
 	Restart.restartApp(
-		/// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
+		/// Web: fill webOrigin only when your new origin differs from the app's origin
 		// webOrigin: 'http://example.com',
 
-		// Customizing the restart notification message (only needed on iOS)
+		/// iOS: customize the local notification shown after the app exits
 		notificationTitle: 'Restarting App',
 		notificationBody: 'Please tap here to open the app again.',
+
+		/// Android: set to true for a full cold restart (kills the process)
+		// forceKill: true,
 	);
 }
 ```

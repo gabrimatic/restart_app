@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 // In order to *not* need this ignore, consider extracting the "web" version
@@ -33,7 +31,7 @@ class RestartWeb {
   /// Handles method calls from the Flutter code.
   ///
   /// If the method call is 'restartApp', it calls the `restart` method with the given `webOrigin`.
-  /// Otherwise, it returns 'false' to signify that the method call was not recognized.
+  /// Otherwise, throws a [PlatformException] for unrecognized method calls.
   Future<dynamic> handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'restartApp':
@@ -41,7 +39,10 @@ class RestartWeb {
         final webOrigin = args?['webOrigin'] as String?;
         return restart(webOrigin);
       default:
-        return 'false';
+        throw PlatformException(
+          code: 'Unimplemented',
+          message: '${call.method} is not implemented on the web platform.',
+        );
     }
   }
 

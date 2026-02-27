@@ -4,14 +4,14 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'restart_app'
-  s.version          = '0.0.1'
-  s.summary          = 'A new Flutter project.'
+  s.version          = '1.5.1'
+  s.summary          = 'A Flutter plugin to restart the app using native APIs.'
   s.description      = <<-DESC
-A new Flutter project.
+A Flutter plugin that helps you to restart the whole Flutter app with a single function call by using native APIs.
                        DESC
-  s.homepage         = 'http://example.com'
+  s.homepage         = 'https://github.com/gabrimatic/restart_app'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
+  s.author           = { 'gabrimatic' => 'AshkanGabriel@gmail.com' }
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'

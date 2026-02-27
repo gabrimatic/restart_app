@@ -3,6 +3,8 @@ package gabrimatic.info.restart
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.NonNull
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -41,10 +43,13 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      * Handles method calls from the Flutter code.
      *
      * If the method call is 'restartApp', it restarts the app and sends a successful result.
+     * When forceKill is true, the current process is terminated after the new activity starts,
+     * ensuring a full cold restart with no stale native resource locks.
      * For any other method call, it sends a 'not implemented' result.
      */
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         if (call.method == "restartApp") {
+            val forceKill = call.argument<Boolean>("forceKill") ?: false
             val currentActivity = activity
             val intent = currentActivity?.packageManager?.getLaunchIntentForPackage(currentActivity.packageName)
 
@@ -58,6 +63,12 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             currentActivity.startActivity(intent)
             currentActivity.finishAffinity()
+
+            if (forceKill) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    Runtime.getRuntime().exit(0)
+                }, 200)
+            }
         } else {
             result.notImplemented()
         }
