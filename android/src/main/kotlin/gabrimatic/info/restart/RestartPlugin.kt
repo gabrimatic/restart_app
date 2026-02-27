@@ -45,8 +45,19 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      */
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         if (call.method == "restartApp") {
-            restartApp()
+            val currentActivity = activity
+            val intent = currentActivity?.packageManager?.getLaunchIntentForPackage(currentActivity.packageName)
+
+            if (currentActivity == null || intent == null) {
+                result.error("RESTART_FAILED", "Could not restart the application", null)
+                return
+            }
+
             result.success("ok")
+
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            currentActivity.startActivity(intent)
+            currentActivity.finishAffinity()
         } else {
             result.notImplemented()
         }
@@ -59,19 +70,6 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      */
     override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
-    }
-
-    /**
-     * Restarts the application.
-     */
-    private fun restartApp() {
-        activity?.let { currentActivity ->
-            val intent =
-                currentActivity.packageManager.getLaunchIntentForPackage(currentActivity.packageName)
-            intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            currentActivity.startActivity(intent)
-            currentActivity.finishAffinity()
-        }
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {

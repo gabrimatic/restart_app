@@ -37,7 +37,9 @@ class RestartWeb {
   Future<dynamic> handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'restartApp':
-        return restart(call.arguments as String?);
+        final args = call.arguments as Map?;
+        final webOrigin = args?['webOrigin'] as String?;
+        return restart(webOrigin);
       default:
         return 'false';
     }
@@ -51,9 +53,16 @@ class RestartWeb {
   ///
   /// This method replaces the current location with the given `webOrigin` (or `window.origin` if
   /// `webOrigin` is null), effectively reloading the web app.
-  void restart(String? webOrigin) {
-    web.window.location.replace(
-      webOrigin ?? web.window.origin.toString(),
-    );
+  String restart(String? webOrigin) {
+    final origin = (webOrigin != null && webOrigin.isNotEmpty) ? webOrigin : null;
+    if (origin != null && origin.startsWith('#')) {
+      web.window.location.hash = origin;
+      web.window.location.reload();
+    } else {
+      web.window.location.replace(
+        origin ?? web.window.origin.toString(),
+      );
+    }
+    return 'ok';
   }
 }

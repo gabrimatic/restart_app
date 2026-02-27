@@ -1,3 +1,10 @@
+## 1.3.3
+
+* Fixed web platform crash caused by argument type mismatch ([#35](https://github.com/gabrimatic/restart_app/issues/35), [#51](https://github.com/gabrimatic/restart_app/issues/51))
+* Fixed web hash URL strategy not working ([#14](https://github.com/gabrimatic/restart_app/issues/14))
+* Fixed Android crash when launch intent is unavailable ([#50](https://github.com/gabrimatic/restart_app/issues/50))
+* Fixed iOS `restartApp()` always returning false ([#48](https://github.com/gabrimatic/restart_app/issues/48))
+
 ## 1.3.2
 * Updated web package to the stable version
 

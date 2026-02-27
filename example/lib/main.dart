@@ -2,10 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:restart_app/restart_app.dart';
-import 'package:url_strategy/url_strategy.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 void main() {
-  setPathUrlStrategy();
+  usePathUrlStrategy();
 
   runApp(const MaterialApp(home: SplashPage()));
 }
