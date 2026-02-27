@@ -29,7 +29,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: dart format --set-exit-if-changed lib/
+      - run: dart format --set-exit-if-changed lib/ test/
 
   test:
     name: Test
@@ -42,7 +42,30 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter test
-      - run: cd example && flutter test
+      - run: cd example && flutter pub get && flutter test
+
+  kotlin-format:
+    name: Kotlin format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.5.0/ktlint && chmod +x ktlint
+      - run: ./ktlint 'android/src/main/kotlin/**/*.kt'
+
+  swift-format:
+    name: Swift format
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcrun swift-format lint --recursive ios/Classes/ macos/Classes/
+
+  cpp-format:
+    name: C++ format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y clang-format
+      - run: clang-format --dry-run --Werror linux/restart_app_plugin.cc windows/restart_app_plugin.cpp windows/restart_app_plugin_c_api.cpp
 
   publish-check:
     name: Publish check

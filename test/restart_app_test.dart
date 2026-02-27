@@ -88,4 +88,14 @@ void main() {
     expect(args['notificationBody'], 'Tap to reopen');
     expect(args['forceKill'], isTrue);
   });
+
+  test('restartApp returns false on PlatformException', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      throw PlatformException(code: 'RESTART_FAILED', message: 'No activity');
+    });
+
+    final result = await Restart.restartApp();
+    expect(result, isFalse);
+  });
 }

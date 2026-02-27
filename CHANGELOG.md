@@ -1,6 +1,15 @@
+## 1.7.0
+
+* Added native Linux support. Restarts via `execv`, replacing the current process in-place
+* Added native Windows support. Launches a new instance via `CreateProcess` and exits
+* Added Android TV and Fire TV support via leanback launcher fallback
+* `restartApp()` now returns `false` on native errors instead of throwing `PlatformException`
+* Added CI with code quality checks, formatting, and native linting (Kotlin, Swift, C++)
+* Added unit tests
+
 ## 1.6.0
 
-* Added native macOS support via a Swift plugin — restarts the app by launching a new instance using `NSWorkspace` and terminating the current process
+* Added native macOS support via a Swift plugin. Restarts the app by launching a new instance using `NSWorkspace` and terminating the current process
 
 ## 1.5.2
 
@@ -10,10 +19,10 @@
 
 ## 1.5.1
 
-* Added `forceKill` option for Android — fully terminates the process after restart for a clean cold start
+* Added `forceKill` option for Android. Fully terminates the process after restart for a clean cold start
 * Fixed iOS restart not working due to incorrect AppDelegate cast
 * Implemented proper iOS restart using local notifications with permission handling
-* **Breaking (iOS):** Returns a `PlatformException` with code `NOTIFICATION_DENIED` if notification permission is denied — handle this in your code
+* **Breaking (iOS):** Returns a `PlatformException` with code `NOTIFICATION_DENIED` if notification permission is denied. Handle this in your code
 * Removed unused `plugin_platform_interface` dependency
 * Fixed iOS podspec placeholder metadata
 * Fixed nested MaterialApp in example app

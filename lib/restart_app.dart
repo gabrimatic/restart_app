@@ -42,6 +42,11 @@ class Restart {
       'notificationBody': notificationBody,
       'forceKill': forceKill,
     };
-    return (await _channel.invokeMethod('restartApp', args)) == 'ok';
+    try {
+      final result = await _channel.invokeMethod<String>('restartApp', args);
+      return result == 'ok';
+    } on PlatformException {
+      return false;
+    }
   }
 }

@@ -1,11 +1,11 @@
 package gabrimatic.info.restart
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import androidx.annotation.NonNull
+import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -22,19 +22,19 @@ import io.flutter.plugin.common.MethodChannel.Result
  *
  * The main functionality is provided by the `onMethodCall` method.
  */
-class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
-    private lateinit var context: Context
+class RestartPlugin :
+    FlutterPlugin,
+    MethodCallHandler,
+    ActivityAware {
     private lateinit var channel: MethodChannel
     private var activity: Activity? = null
 
     /**
      * Called when the plugin is attached to the Flutter engine.
      *
-     * It initializes the `context` with the application context and
-     * sets this plugin instance as the handler for method calls from Flutter.
+     * Sets this plugin instance as the handler for method calls from Flutter.
      */
-    override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-        context = flutterPluginBinding.applicationContext
+    override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "restart")
         channel.setMethodCallHandler(this)
     }
@@ -53,14 +53,31 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      *
      * For any other method call, it sends a 'not implemented' result.
      */
-    override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
+    override fun onMethodCall(
+        call: MethodCall,
+        result: Result,
+    ) {
         if (call.method == "restartApp") {
             val forceKill = call.argument<Boolean>("forceKill") ?: false
             val currentActivity = activity
-            val intent = currentActivity?.packageManager?.getLaunchIntentForPackage(currentActivity.packageName)
 
-            if (currentActivity == null || intent == null) {
-                result.error("RESTART_FAILED", "Could not restart the application", null)
+            if (currentActivity == null) {
+                result.error("RESTART_FAILED", "No activity available", null)
+                return
+            }
+
+            val pm = currentActivity.packageManager
+            val pkg = currentActivity.packageName
+
+            // Try the standard launcher intent first, then fall back to the leanback
+            // launcher used by Android TV and Fire TV devices (API 21+).
+            var intent = pm.getLaunchIntentForPackage(pkg)
+            if (intent == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                intent = pm.getLeanbackLaunchIntentForPackage(pkg)
+            }
+
+            if (intent == null) {
+                result.error("RESTART_FAILED", "No launchable activity found for $pkg", null)
                 return
             }
 
@@ -70,16 +87,16 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             // to the Dart side before the Flutter engine is torn down.
             val delay = if (forceKill) 300L else 100L
             Handler(Looper.getMainLooper()).postDelayed({
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 try {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                     currentActivity.startActivity(intent)
+                    if (forceKill) {
+                        Runtime.getRuntime().exit(0)
+                    } else {
+                        currentActivity.finishAffinity()
+                    }
                 } catch (e: Exception) {
-                    return@postDelayed
-                }
-                if (forceKill) {
-                    Runtime.getRuntime().exit(0)
-                } else {
-                    currentActivity.finishAffinity()
+                    Log.e("RestartPlugin", "Restart failed: ${e.message}", e)
                 }
             }, delay)
         } else {
@@ -92,7 +109,7 @@ class RestartPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
      *
      * It removes the handler for method calls from Flutter.
      */
-    override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
     }
 

@@ -2,7 +2,7 @@
 
 [![pub package](https://img.shields.io/pub/v/restart_app.svg)](https://pub.dev/packages/restart_app) [![likes](https://img.shields.io/pub/likes/restart_app)](https://pub.dev/packages/restart_app/score) [![popularity](https://img.shields.io/pub/popularity/restart_app)](https://pub.dev/packages/restart_app/score) [![pub points](https://img.shields.io/pub/points/restart_app)](https://pub.dev/packages/restart_app/score)
 
-Restart your Flutter app with a single function call. Works on Android, iOS, web, and macOS using native APIs on each platform.
+Restart your Flutter app with a single function call. Works on Android, iOS, web, macOS, Linux, and Windows using native APIs on each platform.
 
 ## Quick start
 
@@ -10,7 +10,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  restart_app: ^1.6.0
+  restart_app: ^1.7.0
 ```
 
 Import and call:
@@ -18,8 +18,10 @@ Import and call:
 ```dart
 import 'package:restart_app/restart_app.dart';
 
-Restart.restartApp();
+final restarted = await Restart.restartApp();
 ```
+
+Returns `true` if the restart was initiated. Returns `false` on failure (permission denied, missing executable, no launchable activity).
 
 ## Parameters
 
@@ -32,12 +34,14 @@ Restart.restartApp();
 
 ## Platform behavior
 
-| Platform | Mechanism |
-|----------|-----------|
-| **Android** | Relaunches the main activity via `PackageManager`. With `forceKill: true`, kills the process after launch for a clean cold start. |
-| **iOS** | Schedules a local notification, then exits via `exit(0)`. Tap the notification to reopen. Not a fully automatic restart. |
-| **Web** | Reloads the page using `window.location`. |
-| **macOS** | Launches a new instance via `NSWorkspace` and terminates the current process. Fully automatic. |
+| Platform | Mechanism | Limitations |
+|----------|-----------|-------------|
+| **Android** | Relaunches the main activity via `PackageManager`. Supports Android TV and Fire TV via leanback launcher fallback. With `forceKill: true`, kills the process after launch for a clean cold start. | None |
+| **iOS** | Schedules a local notification, then exits via `exit(0)`. Tap the notification to reopen. Not a fully automatic restart. | Requires notification permission. Apple's App Store guidelines discourage `exit()`. |
+| **Web** | Reloads the page using `window.location`. | None |
+| **macOS** | Launches a new instance via `NSWorkspace` and terminates the current process. | Sandboxed (Mac App Store) builds cannot launch new instances of themselves. Returns `false` in this case. |
+| **Linux** | Replaces the current process via `execv`. Fully automatic. | None |
+| **Windows** | Launches a new instance via `CreateProcess` and terminates the current process. | MSIX-packaged (Microsoft Store) apps cannot be relaunched via `CreateProcess`. |
 
 ## iOS
 
@@ -58,23 +62,30 @@ The plugin requests notification permission at the moment of restart. If not alr
 
 Request permission earlier in your app's lifecycle. The [permission_handler](https://pub.dev/packages/permission_handler) package works well for this.
 
-If notification permission has been denied, `restartApp()` throws a `PlatformException` with code `NOTIFICATION_DENIED`:
-
-```dart
-try {
-  await Restart.restartApp();
-} on PlatformException catch (e) {
-  if (e.code == 'NOTIFICATION_DENIED') {
-    // Prompt the user to enable notifications in Settings
-  }
-}
-```
+If notification permission has been denied, `restartApp()` returns `false`.
 
 ### Provisioning profiles
 
 `restart_app` uses **local notifications only**, not push notifications. It adds no push-related entitlements to your app.
 
 If you see `"requires a provisioning profile with the Push Notifications feature"` when exporting an IPA, another dependency is the cause (commonly `firebase_messaging`). Add the Push Notifications capability to your distribution provisioning profile.
+
+## Linux
+
+### Command-line arguments
+
+By default, the restarted process launches without the original command-line arguments. To preserve them, call `restart_app_plugin_store_argv` in your `linux/main.cc` before running the Flutter engine:
+
+```cpp
+#include <restart_app/restart_app_plugin.h>
+
+int main(int argc, char** argv) {
+  restart_app_plugin_store_argv(argc, argv);
+  // ... rest of main()
+}
+```
+
+Most Flutter apps don't rely on command-line arguments, so this step is optional.
 
 ## Background isolates
 
