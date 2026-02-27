@@ -77,7 +77,7 @@ Add the following to the project /ios/Runner/Info.plist file. This will allow th
 
 
 ## Developer
-By [Hossein Yousefpour](https://gabrimatic.info "Hossein Yousefpour")
+Created by [Soroush Yousefpour](https://gabrimatic.info)
 
 &copy; All rights reserved.
 

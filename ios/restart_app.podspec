@@ -11,7 +11,7 @@ A Flutter plugin that helps you to restart the whole Flutter app with a single f
                        DESC
   s.homepage         = 'https://github.com/gabrimatic/restart_app'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'gabrimatic' => 'AshkanGabriel@gmail.com' }
+  s.author           = { 'Soroush Yousefpour' => 'https://gabrimatic.info' }
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
