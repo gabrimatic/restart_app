@@ -1,3 +1,7 @@
+## 1.7.1
+
+* Added Swift Package Manager support for iOS and macOS
+
 ## 1.7.0
 
 * Added native Linux support. Restarts via `execv`, replacing the current process in-place
