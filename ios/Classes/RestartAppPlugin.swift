@@ -26,8 +26,7 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
           case .authorized, .provisional, .ephemeral:
             self.scheduleAndExit(title: title, body: body, result: result)
           case .notDetermined:
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) {
-              granted, error in
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
               DispatchQueue.main.async {
                 if let error = error {
                   result(
@@ -43,8 +42,8 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
                   result(
                     FlutterError(
                       code: "NOTIFICATION_DENIED",
-                      message:
-                        "Notification permission is required to restart the app on iOS. The user must grant notification permission before calling restartApp().",
+                      message: "Notification permission is required to restart the app on iOS."
+                        + " The user must grant notification permission before calling restartApp().",
                       details: nil
                     ))
                 }
@@ -54,8 +53,8 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
             result(
               FlutterError(
                 code: "NOTIFICATION_DENIED",
-                message:
-                  "Notification permission is required to restart the app on iOS. The user has denied notification permission.",
+                message: "Notification permission is required to restart the app on iOS."
+                  + " The user has denied notification permission.",
                 details: nil
               ))
           }

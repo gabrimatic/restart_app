@@ -4,17 +4,17 @@ import PackageDescription
 let package = Package(
     name: "restart_app",
     platforms: [
-        .iOS("12.0"),
+        .macOS("10.15")
     ],
     products: [
-        .library(name: "restart-app", targets: ["restart_app"]),
+        .library(name: "restart-app", targets: ["restart_app"])
     ],
     dependencies: [],
     targets: [
         .target(
             name: "restart_app",
             dependencies: [],
-            path: "Classes"
-        ),
+            path: "../Classes"
+        )
     ]
 )

@@ -1,3 +1,7 @@
+## 1.7.2
+
+* Fixed Swift Package Manager file locations for iOS and macOS
+
 ## 1.7.1
 
 * Added Swift Package Manager support for iOS and macOS
