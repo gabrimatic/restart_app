@@ -9,7 +9,7 @@ A Flutter plugin that helps you to restart the whole Flutter app with a single f
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Soroush Yousefpour' => 'https://gabrimatic.info' }
   s.source           = { :path => '.' }
-  s.source_files = 'Classes/**/*'
+  s.source_files = 'restart_app/Sources/restart_app/**/*'
   s.dependency 'FlutterMacOS'
   s.platform = :osx, '10.15'
 

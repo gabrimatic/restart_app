@@ -14,7 +14,7 @@ let package = Package(
         .target(
             name: "restart_app",
             dependencies: [],
-            path: "../Classes"
+            path: "Sources/restart_app"
         )
     ]
 )

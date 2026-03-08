@@ -27,7 +27,7 @@ lib/
 android/src/main/kotlin/gabrimatic/info/restart/
 └── RestartPlugin.kt     # Android implementation (Kotlin)
 
-ios/Classes/
+ios/restart_app/Sources/restart_app/
 └── RestartAppPlugin.swift  # iOS implementation (Swift, UserNotifications)
 ```
 

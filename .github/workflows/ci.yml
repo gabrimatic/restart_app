@@ -57,7 +57,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: xcrun swift-format lint --recursive ios/Classes/ macos/Classes/
+      - run: xcrun swift-format lint --recursive ios/restart_app/Sources/ macos/restart_app/Sources/
 
   cpp-format:
     name: C++ format
