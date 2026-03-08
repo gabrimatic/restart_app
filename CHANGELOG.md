@@ -1,3 +1,7 @@
+## 1.7.3
+
+* Fixed Xcode build failure caused by SPM target path resolving outside the package root ([#52](https://github.com/gabrimatic/restart_app/issues/52))
+
 ## 1.7.2
 
 * Fixed Swift Package Manager file locations for iOS and macOS

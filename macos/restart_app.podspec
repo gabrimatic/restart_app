@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'restart_app'
-  s.version          = '1.7.2'
+  s.version          = '1.7.3'
   s.summary          = 'A Flutter plugin to restart the app using native APIs.'
   s.description      = <<-DESC
 A Flutter plugin that helps you to restart the whole Flutter app with a single function call by using native APIs.
