@@ -88,11 +88,9 @@ RestartApp package requests local notification permissions just before the app r
 While this permission request is handled within the swift code by default, it's recommended that you handle the notification permissions at an earlier point in your app's lifecycle.
 This is because there could be a delay in iOS granting notification permissions, especially if the user needs to manually allow it in their device's settings. Furthermore, if permissions are requested without context, the user might deny them, resulting in a poor user experience. 
 
-To handle the notification permissions earlier and provide context to the user, you can use packages like [permission_handler](https://pub.dev/packages/permission_handler "permission_handler").
+To handle notification permissions earlier and provide context to the user, you can use packages like [permission_handler](https://pub.dev/packages/permission_handler "permission_handler").
 
-**Here is the configuration you need to add:**
-
-Add the following to the project /ios/Runner/Info.plist file. This will allow the app to send local notifications. Replace PRODUCT_BUNDLE_IDENTIFIER and example with your actual bundle identifier and URL scheme:
+Add the following to `/ios/Runner/Info.plist`. This will allow the app to send local notifications. Replace PRODUCT_BUNDLE_IDENTIFIER and example with your actual bundle identifier and URL scheme:
 
 ```
 <key>CFBundleURLTypes</key>
