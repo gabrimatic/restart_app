@@ -1,10 +1,8 @@
 # Restart app in Flutter
 
+A Flutter plugin that restarts the whole Flutter app with a single function call, using native APIs on each platform.
 
-A Flutter plugin that helps you to restart the whole Flutter app with a single function call by using **Native APIs**.
-
-
-## How to use it?
+## Usage
 **1.  Add the package to pubspec.yaml dependency:**
 
 ```yaml
@@ -41,17 +39,17 @@ onPressed: () {
 
 ## New in v1.4.0
 
-### Enhanced Parameters
+### Additional parameters
 
-The `restartApp()` method now supports additional optional parameters:
+`restartApp()` now accepts:
 
-- **`delayBeforeRestart`** (int): Delay in milliseconds before the restart occurs. Useful for cleanup operations or showing user feedback.
-- **`forceKill`** (bool): Forces complete process termination on Android for better cleanup of resources like device connections.
+- **`delayBeforeRestart`** (int): delay in milliseconds before restart. Useful for cleanup or showing user feedback.
+- **`forceKill`** (bool): forces process termination on Android, helpful for cleaning up device connections.
 
-### Web Platform Improvements
+### Web platform
 
-- **Hash URL Strategy Support**: Properly handles single-page applications with hash-based routing
-- **Better Error Handling**: Fixed type casting issues and improved error messages
+- **Hash URL strategy support**: handles single-page apps with hash-based routing.
+- **Error handling**: fixed type-casting issues and improved error messages.
 
 ### Usage Examples
 
@@ -77,9 +75,9 @@ Restart.restartApp(
 );
 ```
 
-## iOS Platform Config
-In order to restart your Flutter application on iOS, due to the platform's limitations, the app will exit and send a local notification to the user. The user can then tap this notification to reopen the app.
-This is not a full app restart, but it's the **closest workaround possible** on iOS.
+## iOS platform config
+
+Due to platform limitations on iOS, the app exits and sends a local notification. The user taps the notification to reopen the app. This is the closest available workaround on iOS.
 
 ##### Customization:
 You can configure the notification’s title and body by passing the `notificationTitle` and `notificationBody` parameters to the `.restartApp` method. These parameters allow you to customize the content of the local notification triggered upon app exit.
