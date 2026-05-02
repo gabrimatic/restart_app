@@ -29,7 +29,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: dart format --set-exit-if-changed lib/ test/
+      - run: dart format --set-exit-if-changed lib/ test/ example/lib/ example/test/
 
   test:
     name: Test
@@ -43,6 +43,72 @@ jobs:
       - run: flutter pub get
       - run: flutter test
       - run: cd example && flutter pub get && flutter test
+
+  build-android:
+    name: Build Android example
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: cd example && flutter pub get && flutter build apk
+
+  build-web:
+    name: Build web example
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: cd example && flutter pub get && flutter build web
+
+  build-linux:
+    name: Build Linux example
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - run: flutter create --platforms=linux /tmp/restart_app_linux_smoke
+      - run: cd /tmp/restart_app_linux_smoke && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
+      - run: cd /tmp/restart_app_linux_smoke && flutter build linux
+
+  build-macos-ios:
+    name: Build macOS and iOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: cd example && flutter pub get && flutter build ios --no-codesign
+      - run: flutter create --platforms=macos /tmp/restart_app_macos_smoke
+      - run: cd /tmp/restart_app_macos_smoke && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
+      - run: cd /tmp/restart_app_macos_smoke && flutter build macos
+
+  build-windows:
+    name: Build Windows example
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter create --platforms=windows "$env:RUNNER_TEMP\restart_app_windows_smoke"
+      - run: flutter pub add restart_app --path "$env:GITHUB_WORKSPACE"
+        working-directory: ${{ runner.temp }}\restart_app_windows_smoke
+      - run: flutter build windows
+        working-directory: ${{ runner.temp }}\restart_app_windows_smoke
 
   kotlin-format:
     name: Kotlin format
