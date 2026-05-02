@@ -12,7 +12,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  restart_app: ^1.7.0
+  restart_app: ^1.8.0
 ```
 
 Import and call:
@@ -28,14 +28,12 @@ Returns `true` if the restart was initiated. Returns `false` on failure (permiss
 For structured errors and capabilities, use the newer API:
 
 ```dart
-final capability = await Restart.restartCapability();
-
 final result = await Restart.restart(
   mode: RestartMode.platformDefault,
 );
 
 if (!result.success) {
-  debugPrint('${result.code}: ${result.message}');
+  // Show or log result.code and result.message.
 }
 ```
 

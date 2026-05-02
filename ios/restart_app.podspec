@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'restart_app'
-  s.version          = '1.7.3'
+  s.version          = '1.8.0'
   s.summary          = 'A Flutter plugin to restart or relaunch apps with platform-specific behavior.'
   s.description      = <<-DESC
 A Flutter plugin that helps restart or relaunch Flutter apps with platform-specific behavior, including opt-in iOS Flutter engine restart.

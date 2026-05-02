@@ -17,9 +17,9 @@ Expect acknowledgment within 48 hours.
 
 ## Scope
 
-This package facilitates app restarts on Android, iOS, and web using platform APIs. It does not handle user data, authentication, networking, or persistent storage.
+This package facilitates app restart or relaunch behavior across Android, iOS, web, macOS, Linux, and Windows. iOS uses an opt-in same-process Flutter engine restart because iOS does not provide a public API for automatic full process restart. It does not handle user data, authentication, networking, or persistent storage.
 
-Reports related to process lifecycle abuse, notification permission misuse, or privilege escalation are taken seriously.
+Reports related to process lifecycle abuse, notification permission misuse, native resource cleanup, or privilege escalation are taken seriously.
 
 ## Out of Scope
 
@@ -30,4 +30,4 @@ Reports related to process lifecycle abuse, notification permission misuse, or p
 
 | Version | Supported |
 |---------|-----------|
-| 1.5.x   | Yes       |
+| 1.8.x   | Yes       |

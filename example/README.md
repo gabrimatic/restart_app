@@ -1,16 +1,18 @@
 # restart_example
 
-Demonstrates how to use the restart plugin.
+Demonstrates how to use `restart_app`.
 
-## Getting Started
+The example app shows:
 
-This project is a starting point for a Flutter application.
+- `Restart.restart()` with structured success/error handling
+- path URL strategy on web
+- opt-in iOS Flutter engine restart setup in `ios/Runner/AppDelegate.swift`
 
-A few resources to get you started if this is your first Flutter project:
+## Running
 
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
+```bash
+flutter pub get
+flutter run
+```
 
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+On iOS, the example configures a custom `FlutterEngine` factory and re-registers plugins with `GeneratedPluginRegistrant` so `RestartMode.platformDefault` can use Flutter engine restart instead of the legacy notification fallback.

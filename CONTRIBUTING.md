@@ -28,16 +28,28 @@ android/src/main/kotlin/gabrimatic/info/restart/
 └── RestartPlugin.kt     # Android implementation (Kotlin)
 
 ios/restart_app/Sources/restart_app/
-└── RestartAppPlugin.swift  # iOS implementation (Swift, UserNotifications)
+└── RestartAppPlugin.swift  # iOS implementation (Swift, FlutterEngine, UserNotifications fallback)
+
+linux/
+└── restart_app_plugin.cc   # Linux implementation (execv)
+
+macos/restart_app/Sources/restart_app/
+└── RestartAppPlugin.swift  # macOS implementation (NSWorkspace)
+
+windows/
+└── restart_app_plugin.cpp  # Windows implementation (CreateProcessW)
 ```
 
 All platforms communicate over a single `MethodChannel` named `restart`.
 
 ## Platform Notes
 
-- **Android**: Uses `ActivityAware` to get a reference to the current activity. The `forceKill` option calls `Runtime.getRuntime().exit(0)` after 200ms.
-- **iOS**: Uses `UNUserNotificationCenter` to schedule a local notification before calling `exit(0)`. Notification permission must be granted.
+- **Android**: Uses `ActivityAware` to get a reference to the current activity. It relaunches the main activity with package-manager launcher intents. The `forceKill` option terminates the old process after the new activity starts.
+- **iOS**: iOS has no public API for automatic full process restart. The recommended path is opt-in Flutter engine restart: the host app provides plugin registration, the plugin creates a fresh `FlutterEngine`, runs Dart again, replaces the root `FlutterViewController`, and destroys the old engine context. The notification + `exit(0)` flow remains only as a legacy fallback.
 - **Web**: Uses `window.location.replace` or `window.location.hash` for hash-based routing.
+- **macOS**: Uses `NSWorkspace` to launch a new app instance, then terminates the current process.
+- **Linux**: Uses `execv` to replace the current process.
+- **Windows**: Uses `CreateProcessW` to launch a new instance, then exits the current process.
 
 ## PR Checklist
 
