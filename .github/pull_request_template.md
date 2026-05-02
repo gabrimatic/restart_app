@@ -6,7 +6,10 @@ What does this PR change and why?
 
 - [ ] Android
 - [ ] iOS
+- [ ] Linux
+- [ ] macOS
 - [ ] Web
+- [ ] Windows
 
 ## Testing
 

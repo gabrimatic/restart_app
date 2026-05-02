@@ -12,7 +12,10 @@ A clear description of what the bug is.
 
 - [ ] Android
 - [ ] iOS
+- [ ] Linux
+- [ ] macOS
 - [ ] Web
+- [ ] Windows
 
 ## Reproduction Steps
 

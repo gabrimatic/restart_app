@@ -20,5 +20,8 @@ How you envision this working. Include API design or behavior changes if relevan
 
 - [ ] Android
 - [ ] iOS
+- [ ] Linux
+- [ ] macOS
 - [ ] Web
+- [ ] Windows
 - [ ] All platforms
