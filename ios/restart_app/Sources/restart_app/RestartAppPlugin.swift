@@ -261,6 +261,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
     let oldEngine = oldFlutterViewController?.engine
 
     do {
+      beforeRestart?()
       let newEngine = try factory()
       let newFlutterViewController = FlutterViewController(
         engine: newEngine,
@@ -268,7 +269,6 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
         bundle: nil
       )
 
-      beforeRestart?()
       oldRootViewController?.dismiss(animated: false)
       retainedEngine = newEngine
       viewControllerInstaller(window, newFlutterViewController)

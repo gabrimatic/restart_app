@@ -19,6 +19,20 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
         "reason": NSNull(),
       ])
     } else if call.method == "restartApp" {
+      let args = call.arguments as? [String: Any] ?? [:]
+      let mode = args["mode"] as? String ?? "platformDefault"
+      let structuredResult = args["structuredResult"] as? Bool ?? false
+
+      if mode != "platformDefault" && mode != "process" {
+        result(
+          FlutterError(
+            code: "UNSUPPORTED_RESTART_MODE",
+            message: "Restart mode '\(mode)' is not supported on macOS.",
+            details: nil
+          ))
+        return
+      }
+
       let url = Bundle.main.bundleURL
       let config = NSWorkspace.OpenConfiguration()
       config.createsNewApplicationInstance = true
@@ -37,7 +51,14 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
                 details: nil
               ))
           } else {
-            result("ok")
+            if structuredResult {
+              result([
+                "success": true,
+                "mode": "process",
+              ])
+            } else {
+              result("ok")
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
               NSApp.terminate(nil)
             }

@@ -65,14 +65,26 @@ class RestartPlugin :
                         "flutterEngineRestart" to false,
                         "notificationFallback" to false,
                         "engineRestartConfigured" to false,
-                        "platformDefaultMode" to "process",
+                        "platformDefaultMode" to "platformDefault",
                         "reason" to null,
                     ),
                 )
             }
 
             "restartApp" -> {
-                val forceKill = call.argument<Boolean>("forceKill") ?: false
+                val mode = call.argument<String>("mode") ?: "platformDefault"
+                val structuredResult = call.argument<Boolean>("structuredResult") ?: false
+                if (mode != "platformDefault" && mode != "process") {
+                    result.error(
+                        "UNSUPPORTED_RESTART_MODE",
+                        "Restart mode '$mode' is not supported on Android.",
+                        null,
+                    )
+                    return
+                }
+
+                val forceKill = mode == "process" || (call.argument<Boolean>("forceKill") ?: false)
+                val resolvedMode = if (forceKill) "process" else "platformDefault"
                 val currentActivity = activity
 
                 if (currentActivity == null) {
@@ -95,7 +107,16 @@ class RestartPlugin :
                     return
                 }
 
-                result.success("ok")
+                if (structuredResult) {
+                    result.success(
+                        mapOf(
+                            "success" to true,
+                            "mode" to resolvedMode,
+                        ),
+                    )
+                } else {
+                    result.success("ok")
+                }
 
                 // Delay the destructive operations so the platform channel result can be delivered
                 // to the Dart side before the Flutter engine is torn down.

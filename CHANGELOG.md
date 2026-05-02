@@ -1,3 +1,11 @@
+## 1.8.1
+
+* Fixed restart mode handling so unsupported modes fail instead of silently using a platform default
+* Returned resolved structured restart modes from Android, web, Linux, macOS, and Windows
+* Made Android `RestartMode.process` use the full `forceKill` restart path automatically
+* Updated the example Android Gradle project so the bundled example builds with current Java/Flutter toolchains
+* Ran the iOS `beforeRestart` hook before creating the replacement `FlutterEngine` so apps can clean up native resources first
+
 ## 1.8.0
 
 * Added structured restart API with `Restart.restart()`, `RestartResult`, `RestartMode`, and `Restart.restartCapability()`

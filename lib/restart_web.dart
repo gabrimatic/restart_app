@@ -45,8 +45,23 @@ class RestartWeb {
         };
       case 'restartApp':
         final args = call.arguments as Map?;
+        final mode = args?['mode'] as String? ?? 'platformDefault';
+        if (mode != 'platformDefault') {
+          throw PlatformException(
+            code: 'UNSUPPORTED_RESTART_MODE',
+            message: "Restart mode '$mode' is not supported on web.",
+          );
+        }
+
         final webOrigin = args?['webOrigin'] as String?;
-        return restart(webOrigin);
+        restart(webOrigin);
+        if (args?['structuredResult'] == true) {
+          return <String, Object?>{
+            'success': true,
+            'mode': 'platformDefault',
+          };
+        }
+        return 'ok';
       default:
         throw PlatformException(
           code: 'Unimplemented',

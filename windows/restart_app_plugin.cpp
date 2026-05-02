@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <variant>
 #include <vector>
 
 namespace restart_app {
@@ -59,6 +60,35 @@ void RestartAppPlugin::HandleMethodCall(
     return;
   }
 
+  const auto *arguments =
+      std::get_if<flutter::EncodableMap>(method_call.arguments());
+  std::string mode = "platformDefault";
+  bool structured_result = false;
+
+  if (arguments != nullptr) {
+    auto mode_it = arguments->find(flutter::EncodableValue("mode"));
+    if (mode_it != arguments->end()) {
+      if (const auto *mode_value = std::get_if<std::string>(&mode_it->second)) {
+        mode = *mode_value;
+      }
+    }
+
+    auto structured_it =
+        arguments->find(flutter::EncodableValue("structuredResult"));
+    if (structured_it != arguments->end()) {
+      if (const auto *structured_value =
+              std::get_if<bool>(&structured_it->second)) {
+        structured_result = *structured_value;
+      }
+    }
+  }
+
+  if (mode != "platformDefault" && mode != "process") {
+    result->Error("UNSUPPORTED_RESTART_MODE",
+                  "Restart mode '" + mode + "' is not supported on Windows.");
+    return;
+  }
+
   // Resolve the path to the current executable. Use a dynamically sized buffer
   // to handle paths longer than MAX_PATH, with a cap to prevent runaway loops.
   DWORD buf_size = MAX_PATH;
@@ -90,7 +120,15 @@ void RestartAppPlugin::HandleMethodCall(
   cmd_buf.push_back(L'\0');
 
   // Respond before any destructive action so the Dart side receives the result.
-  result->Success(flutter::EncodableValue("ok"));
+  if (structured_result) {
+    flutter::EncodableMap restart_result = {
+        {flutter::EncodableValue("success"), flutter::EncodableValue(true)},
+        {flutter::EncodableValue("mode"), flutter::EncodableValue("process")},
+    };
+    result->Success(flutter::EncodableValue(restart_result));
+  } else {
+    result->Success(flutter::EncodableValue("ok"));
+  }
 
   // Launch the new instance and terminate on a detached thread so the platform
   // message loop can pump the response back to Dart before the process exits.

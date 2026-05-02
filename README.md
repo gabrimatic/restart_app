@@ -12,7 +12,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  restart_app: ^1.8.0
+  restart_app: ^1.8.1
 ```
 
 Import and call:
@@ -45,13 +45,13 @@ if (!result.success) {
 | `webOrigin` | Web | Custom origin URL for the reload. Defaults to `window.origin`. Supports hash strategy (e.g. `'#/home'`). |
 | `notificationTitle` | iOS | Title of the local notification shown by the legacy notification fallback. |
 | `notificationBody` | iOS | Body of the local notification shown by the legacy notification fallback. |
-| `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. |
+| `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |
 
 ## Platform behavior
 
 | Platform | Mechanism | Limitations |
 |----------|-----------|-------------|
-| **Android** | Relaunches the main activity via `PackageManager`. Supports Android TV and Fire TV via leanback launcher fallback. With `forceKill: true`, kills the process after launch for a clean cold start. | None |
+| **Android** | Relaunches the main activity via `PackageManager`. Supports Android TV and Fire TV via leanback launcher fallback. `RestartMode.process` and `forceKill: true` kill the process after launch for a clean cold start. | None |
 | **iOS** | Recommended: opt-in Flutter engine restart that creates a new `FlutterEngine`, runs Dart again, re-registers plugins, and replaces the root `FlutterViewController` in the same iOS process. Legacy: local notification + `exit(0)` + user tap. | iOS has no public API for automatic full process restart. Engine restart is not a process restart and cannot reset native singleton state. Legacy fallback requires notification permission and user action. |
 | **Web** | Reloads the page using `window.location`. | None |
 | **macOS** | Launches a new instance via `NSWorkspace` and terminates the current process. | Sandboxed (Mac App Store) builds cannot launch new instances of themselves. Returns `false` in this case. |

@@ -84,6 +84,46 @@ static void respond_restart_capability(FlMethodCall *method_call) {
   }
 }
 
+static const gchar *lookup_string_arg(FlValue *args, const gchar *name,
+                                      const gchar *fallback) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) {
+    return fallback;
+  }
+
+  FlValue *value = fl_value_lookup_string(args, name);
+  if (value == nullptr || fl_value_get_type(value) != FL_VALUE_TYPE_STRING) {
+    return fallback;
+  }
+
+  return fl_value_get_string(value);
+}
+
+static gboolean lookup_bool_arg(FlValue *args, const gchar *name,
+                                gboolean fallback) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) {
+    return fallback;
+  }
+
+  FlValue *value = fl_value_lookup_string(args, name);
+  if (value == nullptr || fl_value_get_type(value) != FL_VALUE_TYPE_BOOL) {
+    return fallback;
+  }
+
+  return fl_value_get_bool(value);
+}
+
+static FlMethodResponse *restart_success_response(gboolean structured_result) {
+  if (!structured_result) {
+    return FL_METHOD_RESPONSE(
+        fl_method_success_response_new(fl_value_new_string("ok")));
+  }
+
+  g_autoptr(FlValue) result = fl_value_new_map();
+  fl_value_set_string_take(result, "success", fl_value_new_bool(TRUE));
+  fl_value_set_string_take(result, "mode", fl_value_new_string("process"));
+  return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+}
+
 static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
                            gpointer user_data) {
   const gchar *method = fl_method_call_get_name(method_call);
@@ -91,6 +131,21 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
   if (strcmp(method, "restartCapability") == 0) {
     respond_restart_capability(method_call);
   } else if (strcmp(method, "restartApp") == 0) {
+    FlValue *args = fl_method_call_get_args(method_call);
+    const gchar *mode = lookup_string_arg(args, "mode", "platformDefault");
+    gboolean structured_result =
+        lookup_bool_arg(args, "structuredResult", FALSE);
+
+    if (strcmp(mode, "platformDefault") != 0 && strcmp(mode, "process") != 0) {
+      g_autoptr(FlMethodResponse) err_response =
+          FL_METHOD_RESPONSE(fl_method_error_response_new(
+              "UNSUPPORTED_RESTART_MODE",
+              "Requested restart mode is not supported on Linux", nullptr));
+      g_autoptr(GError) err = nullptr;
+      fl_method_call_respond(method_call, err_response, &err);
+      return;
+    }
+
     // Validate that the executable is resolvable and accessible before
     // responding with success. Once "ok" is sent, failures are silent.
     char exe_path[PATH_MAX];
@@ -112,8 +167,8 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
     }
 
     // Respond before the restart so the Dart side receives the result.
-    g_autoptr(FlMethodResponse) response = FL_METHOD_RESPONSE(
-        fl_method_success_response_new(fl_value_new_string("ok")));
+    g_autoptr(FlMethodResponse) response =
+        restart_success_response(structured_result);
     g_autoptr(GError) error = nullptr;
     if (!fl_method_call_respond(method_call, response, &error)) {
       g_warning("restart_app: failed to send response: %s", error->message);
