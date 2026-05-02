@@ -2,9 +2,9 @@
 
 [![pub package](https://img.shields.io/pub/v/restart_app.svg)](https://pub.dev/packages/restart_app) [![likes](https://img.shields.io/pub/likes/restart_app)](https://pub.dev/packages/restart_app/score) [![popularity](https://img.shields.io/pub/popularity/restart_app)](https://pub.dev/packages/restart_app/score) [![pub points](https://img.shields.io/pub/points/restart_app)](https://pub.dev/packages/restart_app/score)
 
-Restart or relaunch your Flutter app with a single function call.
+Restart or relaunch your Flutter app from Dart with one call.
 
-Android, macOS, Linux, and Windows use platform-specific relaunch behavior. Web reloads the page. iOS does not provide a public API for automatic full process restart, so `restart_app` supports an opt-in Flutter engine restart. The old notification-based iOS flow is available only when explicitly requested.
+Each platform uses the safest supported restart path available to Flutter apps. See [Platform behavior](#platform-behavior) for the exact native mechanism on each target.
 
 ## Quick start
 
@@ -12,7 +12,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  restart_app: ^1.8.2
+  restart_app: ^1.8.3
 ```
 
 Import and call:
@@ -20,21 +20,33 @@ Import and call:
 ```dart
 import 'package:restart_app/restart_app.dart';
 
-final restarted = await Restart.restartApp();
+await Restart.restartApp();
 ```
 
-Returns `true` if the restart was initiated. Returns `false` on failure (missing iOS engine-restart configuration, missing executable, no launchable activity).
-
-For structured errors and capabilities, use the newer API:
+If you need to handle errors:
 
 ```dart
-final result = await Restart.restart(
-  mode: RestartMode.platformDefault,
-);
+final result = await Restart.restartApp();
 
 if (!result.success) {
   // Show or log result.code and result.message.
 }
+```
+
+`Restart.restartApp()` is the restart API. It returns a `RestartResult` with `success`, the resolved `mode`, and platform error details when the restart cannot be started.
+
+## Customization
+
+Default behavior works for normal app restart flows. Pass options only when your app needs a specific platform behavior.
+
+```dart
+await Restart.restartApp(
+  mode: RestartMode.platformDefault,
+  webOrigin: '#/home',
+  forceKill: false,
+  notificationTitle: 'Restart',
+  notificationBody: 'Tap to reopen the app.',
+);
 ```
 
 ## Parameters
@@ -43,8 +55,8 @@ if (!result.success) {
 |-----------|----------|-------------|
 | `mode` | All | Requested restart behavior: `platformDefault`, `flutterEngine`, `process`, or `notificationFallback`. |
 | `webOrigin` | Web | Custom origin URL for the reload. Defaults to `window.origin`. Supports hash strategy (e.g. `'#/home'`). |
-| `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. |
-| `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. |
+| `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Restart`. |
+| `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Tap to reopen the app.` |
 | `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |
 
 ## Platform behavior
@@ -54,7 +66,7 @@ if (!result.success) {
 | **Android** | Relaunches the main activity via `PackageManager`. Supports Android TV and Fire TV via leanback launcher fallback. `RestartMode.process` and `forceKill: true` kill the process after launch for a clean cold start. | None |
 | **iOS** | Recommended: opt-in Flutter engine restart that creates a new `FlutterEngine`, runs Dart again, re-registers plugins, and replaces the root `FlutterViewController` in the same iOS process. Legacy: local notification + `exit(0)` + user tap. | iOS has no public API for automatic full process restart. Engine restart is not a process restart and cannot reset native singleton state. Legacy fallback requires notification permission and user action. |
 | **Web** | Reloads the page using `window.location`. | None |
-| **macOS** | Launches a new instance via `NSWorkspace` and terminates the current process. | Sandboxed (Mac App Store) builds cannot launch new instances of themselves. Returns `false` in this case. |
+| **macOS** | Launches a new instance via `NSWorkspace` and terminates the current process. | Sandboxed (Mac App Store) builds cannot launch new instances of themselves. Returns a failed result in this case. |
 | **Linux** | Replaces the current process via `execv`. Fully automatic. | None |
 | **Windows** | Launches a new instance via `CreateProcess` and terminates the current process. | MSIX-packaged (Microsoft Store) apps cannot be relaunched via `CreateProcess`. |
 
@@ -101,13 +113,19 @@ import restart_app
 Then call:
 
 ```dart
-final result = await Restart.restart(
-  mode: RestartMode.flutterEngine,
-);
+final result = await Restart.restartApp();
 ```
 
 `RestartMode.platformDefault` uses Flutter engine restart on iOS when this setup is present.
 If this setup is missing, `platformDefault` fails cleanly on iOS instead of falling back to notification + `exit(0)`.
+
+To request the engine path explicitly:
+
+```dart
+final result = await Restart.restartApp(
+  mode: RestartMode.flutterEngine,
+);
+```
 
 ### iOS capabilities
 
@@ -115,7 +133,7 @@ If this setup is missing, `platformDefault` fails cleanly on iOS instead of fall
 final capability = await Restart.restartCapability();
 
 if (capability.flutterEngineRestart) {
-  await Restart.restart(mode: RestartMode.flutterEngine);
+  await Restart.restartApp(mode: RestartMode.flutterEngine);
 }
 ```
 
@@ -145,7 +163,7 @@ For code-push systems and plugins with heavy native state, verify behavior in a 
 Use the notification fallback only when the tradeoff is acceptable:
 
 ```dart
-Restart.restart(
+Restart.restartApp(
   mode: RestartMode.notificationFallback,
   notificationTitle: 'Update applied',
   notificationBody: 'Tap to reopen the app.',
@@ -156,7 +174,7 @@ The plugin requests notification permission at the moment of restart. If not alr
 
 Request permission earlier in your app's lifecycle. The [permission_handler](https://pub.dev/packages/permission_handler) package works well for this.
 
-If notification permission has been denied, `restartApp()` returns `false` and `restart()` returns a failed result.
+If notification permission has been denied, `restartApp()` returns a failed result.
 
 ### Provisioning profiles
 

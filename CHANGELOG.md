@@ -1,25 +1,33 @@
+## 1.8.3
+
+* Made `Restart.restartApp(...)` the single Dart restart entry point
+* Changed `Restart.restartApp(...)` to return `RestartResult`, giving one call with `success`, resolved `mode`, `code`, and `message`
+* Kept all restart customization on `Restart.restartApp(...)`: `mode`, `webOrigin`, `forceKill`, `notificationTitle`, and `notificationBody`
+* Refined the example so `main.dart` shows the restart calls directly, while package survival checks live in focused helper files
+* Updated README and example docs so the quick start is platform-neutral and iOS details stay in the iOS section
+
 ## 1.8.2
 
-* Made iOS `restartApp()` fail cleanly when Flutter engine restart is not configured instead of implicitly using the legacy notification fallback
-* Kept the iOS notification fallback available only through explicit `RestartMode.notificationFallback`
-* Removed the internal implicit-fallback argument from the Dart API and iOS plugin channel handling
-* Expanded the example app with restart checks for common Flutter packages
-* Updated README wording to make the no-implicit-workaround iOS behavior clear
+* Tightened iOS default behavior: `platformDefault` now fails cleanly when engine restart is not configured instead of quietly using notification + `exit(0)`
+* Kept notification restart as an explicit `RestartMode.notificationFallback` path for apps that accept the permission prompt, exit, and user-tap tradeoff
+* Removed the internal implicit-fallback flag from the Dart API and iOS platform-channel payload
+* Expanded the example with package checks that exercise common plugin paths after restart
+* Clarified README language around iOS engine restart versus unsupported full process restart
 
 ## 1.8.1
 
-* Fixed restart mode handling so unsupported modes fail instead of silently using a platform default
-* Returned resolved structured restart modes from Android, web, Linux, macOS, and Windows
-* Made Android `RestartMode.process` use the full `forceKill` restart path automatically
-* Updated the example Android Gradle project so the bundled example builds with current Java/Flutter toolchains
-* Ran the iOS `beforeRestart` hook before creating the replacement `FlutterEngine` so apps can clean up native resources first
+* Fixed mode handling so unsupported restart modes fail with a clear platform error instead of silently falling back
+* Returned the resolved restart mode from Android, web, Linux, macOS, and Windows
+* Made Android `RestartMode.process` use the full `forceKill` path automatically
+* Updated the example Android Gradle project for current Java and Flutter toolchains
+* Moved the iOS `beforeRestart` hook before replacement engine creation so apps can clean up native resources first
 
 ## 1.8.0
 
-* Added structured restart API with `Restart.restart()`, `RestartResult`, `RestartMode`, and `Restart.restartCapability()`
-* Added opt-in iOS Flutter engine restart that creates a fresh `FlutterEngine`, re-runs Dart, re-registers plugins through the host app, and replaces the root `FlutterViewController`
+* Added structured restart types with `RestartResult`, `RestartMode`, and `Restart.restartCapability()`
+* Added opt-in iOS Flutter engine restart: fresh `FlutterEngine`, Dart entrypoint rerun, host plugin registration, root `FlutterViewController` replacement, and old engine teardown
 * Kept the existing iOS notification + `exit(0)` behavior as an explicit legacy fallback
-* Updated iOS documentation to distinguish Flutter engine restart from unsupported full process restart
+* Documented the important iOS boundary: Flutter engine restart is supported, automatic full process restart is not available through public iOS APIs
 
 ## 1.7.3
 

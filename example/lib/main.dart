@@ -1,20 +1,7 @@
-import 'dart:async';
-
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
-import 'package:http/http.dart' as http;
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:restart_app_example/platform_probes.dart';
 import 'package:restart_app/restart_app.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
-
-final String bootToken = DateTime.now().microsecondsSinceEpoch.toString();
-int dartOnlyDirtyState = 0;
+import 'package:restart_app_example/restart_checks.dart';
 
 void main() {
   usePathUrlStrategy();
@@ -32,18 +19,11 @@ class RestartAppExample extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Restart App Example',
       theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo)),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+      ),
       home: HomePage(runChecksOnStart: runChecksOnStart),
     );
   }
-}
-
-class ProbeResult {
-  const ProbeResult(this.name, this.ok, this.detail);
-
-  final String name;
-  final bool ok;
-  final String detail;
 }
 
 class HomePage extends StatefulWidget {
@@ -56,175 +36,77 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  var _summary = 'Running checks...';
-  var _lastRestart = 'none';
-  var _launchCount = 0;
-  var _engineRestartCount = 0;
-  var _running = true;
-  List<ProbeResult> _results = const [];
+  var _lastResult = 'No restart requested yet.';
+  var _busy = false;
 
-  bool get _allPass =>
-      _results.isNotEmpty && _results.every((result) => result.ok);
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.runChecksOnStart) {
-      unawaited(_runChecks());
-    } else {
-      _summary = 'Checks not started';
-      _running = false;
-    }
-  }
-
-  Future<void> _runChecks() async {
-    setState(() {
-      _running = true;
-      _summary = 'Running checks...';
-    });
-
-    final results = <ProbeResult>[];
-
-    Future<void> probe(String name, Future<String> Function() body) async {
-      try {
-        final detail = await body().timeout(const Duration(seconds: 12));
-        results.add(ProbeResult(name, true, detail));
-      } catch (error, stackTrace) {
-        debugPrint('Probe failed: $name\n$error\n$stackTrace');
-        results.add(ProbeResult(name, false, '$error'));
-      }
-    }
-
-    await probe('restart capability', () async {
-      final capability = await Restart.restartCapability();
-      return [
-        'default=${capability.platformDefaultMode.name}',
-        'engine=${capability.flutterEngineRestart}',
-        'configured=${capability.engineRestartConfigured}',
-      ].join(', ');
-    });
-
-    await probe('shared preferences', () async {
-      final prefs = await SharedPreferences.getInstance();
-      final launchCount = (prefs.getInt('launchCount') ?? 0) + 1;
-      final engineRestarts = prefs.getInt('engineRestarts') ?? 0;
-      await prefs.setInt('launchCount', launchCount);
-      setState(() {
-        _launchCount = launchCount;
-        _engineRestartCount = engineRestarts;
-      });
-      return 'launch=$launchCount, engineRestarts=$engineRestarts';
-    });
-
-    await probe('package info', () async {
-      final info = await PackageInfo.fromPlatform();
-      return '${info.appName}/${info.version}';
-    });
-
-    await probe('connectivity', () async {
-      final states = await Connectivity().checkConnectivity();
-      return states.map((state) => state.name).join(',');
-    });
-
-    await probe('url launcher', () async {
-      final ok = await canLaunchUrl(Uri.parse('https://example.com'));
-      if (!ok) {
-        throw StateError('cannot launch https URL');
-      }
-      return 'https ok';
-    });
-
-    await probe('http', () async {
-      final response = await http.get(Uri.parse('https://example.com'));
-      if (response.statusCode < 200 || response.statusCode >= 400) {
-        throw StateError('status=${response.statusCode}');
-      }
-      return 'status=${response.statusCode}';
-    });
-
-    await probe('cache manager', () async {
-      final file = await DefaultCacheManager().getSingleFile(
-        'https://www.gstatic.com/webp/gallery/1.sm.jpg',
-      );
-      return 'bytes=${await file.length()}';
-    });
-
-    final platformProbes = await runPlatformProbes(
-      bootToken: bootToken,
-      dartOnlyDirtyState: dartOnlyDirtyState,
+  Future<void> _restartApp() async {
+    await _runRestart(
+      pendingMessage: 'Restart requested with Restart.restartApp()',
+      restart: Restart.restartApp,
     );
-    for (final platformProbe in platformProbes) {
-      results.add(
-        ProbeResult(
-          platformProbe.name,
-          platformProbe.ok,
-          platformProbe.detail,
-        ),
-      );
-    }
-
-    await probe('dart clean state', () async {
-      if (dartOnlyDirtyState != 0) {
-        throw StateError('dirty state survived restart: $dartOnlyDirtyState');
-      }
-      return 'dirty=0, boot=$bootToken';
-    });
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _results = results;
-      _summary = _all(results) ? 'All checks passed' : 'Some checks failed';
-      _running = false;
-    });
   }
 
-  Future<void> _restartEngine() async {
-    dartOnlyDirtyState += 1;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(
-        'engineRestarts', (prefs.getInt('engineRestarts') ?? 0) + 1);
-
-    setState(() {
-      _lastRestart = 'engine restart requested with dirty=$dartOnlyDirtyState';
-    });
-
-    final result = await Restart.restart(mode: RestartMode.flutterEngine);
-    if (!result.success && mounted) {
-      _showFailure(result);
-    }
+  Future<void> _processRestart() async {
+    await _runRestart(
+      pendingMessage: 'Process restart requested.',
+      restart: () => Restart.restartApp(mode: RestartMode.process),
+    );
   }
 
   Future<void> _notificationFallback() async {
-    final result = await Restart.restart(
-      mode: RestartMode.notificationFallback,
-      notificationTitle: 'Restart App Example',
-      notificationBody: 'Tap to reopen the example app.',
+    await _runRestart(
+      pendingMessage: 'iOS notification fallback requested.',
+      restart: () {
+        return Restart.restartApp(
+          mode: RestartMode.notificationFallback,
+          notificationTitle: 'Restart App Example',
+          notificationBody: 'Tap to reopen the example app.',
+        );
+      },
     );
-
-    if (!result.success && mounted) {
-      _showFailure(result);
-    }
   }
 
-  Future<void> _unsupportedProcessMode() async {
-    final result = await Restart.restart(mode: RestartMode.process);
+  Future<void> _runRestart({
+    required String pendingMessage,
+    required Future<RestartResult> Function() restart,
+  }) async {
+    setState(() {
+      _busy = true;
+      _lastResult = pendingMessage;
+    });
+
+    await markRestartCheckDirtyState();
+    final result = await restart();
+
     if (!mounted) {
       return;
     }
+
+    if (!result.success) {
+      resetRestartCheckDirtyState();
+    }
+
     setState(() {
-      _lastRestart =
-          '${result.success}:${result.mode.name}:${result.code ?? 'ok'}';
+      _busy = false;
+      _lastResult = result.success
+          ? 'Restart accepted with mode ${result.mode.name}.'
+          : '${result.code}: ${result.message}';
     });
   }
 
-  void _showFailure(RestartResult result) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(result.message ?? result.code ?? 'Restart failed')),
-    );
+  Future<void> _showCapability() async {
+    final capability = await Restart.restartCapability();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _lastResult = [
+        'default=${capability.platformDefaultMode.name}',
+        'process=${capability.fullProcessRestart}',
+        'engine=${capability.flutterEngineRestart}',
+      ].join(', ');
+    });
   }
 
   @override
@@ -234,63 +116,35 @@ class _HomePageState extends State<HomePage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(_summary, style: Theme.of(context).textTheme.headlineSmall),
+          Text(
+            'Default restart',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
           const SizedBox(height: 8),
-          Text('bootToken: $bootToken'),
-          Text('dartDirty: $dartOnlyDirtyState'),
-          Text('launches: $_launchCount'),
-          Text('engine restarts: $_engineRestartCount'),
-          Text('last restart: $_lastRestart'),
+          const Text('Call Restart.restartApp() for the default behavior.'),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              SvgPicture.string(
-                '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#1565C0"/></svg>',
-                width: 28,
-                height: 28,
-              ),
-              const SizedBox(width: 12),
-              CachedNetworkImage(
-                imageUrl: 'https://www.gstatic.com/webp/gallery/1.sm.jpg',
-                width: 44,
-                height: 44,
-                fit: BoxFit.cover,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const SizedBox(height: 84, child: PlatformPreview()),
-          const SizedBox(height: 16),
           FilledButton(
-            onPressed: _running ? null : _runChecks,
-            child: const Text('Run checks'),
-          ),
-          FilledButton(
-            onPressed: _allPass ? _restartEngine : null,
-            child: const Text('Restart Flutter engine'),
+            onPressed: _busy ? null : _restartApp,
+            child: const Text('Restart app'),
           ),
           OutlinedButton(
-            onPressed: _notificationFallback,
-            child: const Text('Notification fallback'),
+            onPressed: _busy ? null : _processRestart,
+            child: const Text('Process restart'),
+          ),
+          OutlinedButton(
+            onPressed: _busy ? null : _notificationFallback,
+            child: const Text('iOS notification fallback'),
           ),
           TextButton(
-            onPressed: _unsupportedProcessMode,
-            child: const Text('Unsupported process mode'),
+            onPressed: _busy ? null : _showCapability,
+            child: const Text('Show capability'),
           ),
-          const Divider(),
-          for (final result in _results)
-            ListTile(
-              dense: true,
-              leading: Icon(result.ok ? Icons.check_circle : Icons.error),
-              title: Text('${result.name}: ${result.ok ? 'pass' : 'fail'}'),
-              subtitle: Text(result.detail),
-            ),
+          const SizedBox(height: 12),
+          Text(_lastResult),
+          const SizedBox(height: 24),
+          RestartChecksPanel(runChecksOnStart: widget.runChecksOnStart),
         ],
       ),
     );
   }
-}
-
-bool _all(List<ProbeResult> results) {
-  return results.isNotEmpty && results.every((result) => result.ok);
 }

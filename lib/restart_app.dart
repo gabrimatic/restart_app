@@ -5,10 +5,10 @@ enum RestartMode {
   /// Uses the best behavior available for the current platform.
   platformDefault,
 
-  /// Recreates the Flutter engine in the same native process.
+  /// Recreates the Flutter engine in the same native process where supported.
   ///
-  /// This is the recommended iOS mode when the host app has configured engine
-  /// restart. It is not a full process restart.
+  /// This is currently used by iOS when the host app has configured engine
+  /// restart. It is not a full native process restart.
   flutterEngine,
 
   /// Requests a native process relaunch where the platform supports it.
@@ -37,10 +37,10 @@ class RestartCapability {
   /// Whether this platform can recreate Flutter in the current native process.
   final bool flutterEngineRestart;
 
-  /// Whether the iOS legacy notification fallback is available.
+  /// Whether notification fallback is available on the current platform.
   final bool notificationFallback;
 
-  /// Whether iOS Flutter engine restart has been configured by the host app.
+  /// Whether Flutter engine restart has been configured by the host app.
   final bool engineRestartConfigured;
 
   /// The behavior used by [RestartMode.platformDefault].
@@ -62,7 +62,7 @@ class RestartCapability {
   }
 }
 
-/// Structured result returned by [Restart.restart].
+/// Structured result returned by [Restart.restartApp].
 class RestartResult {
   /// Creates a restart result.
   const RestartResult({
@@ -136,12 +136,23 @@ class Restart {
 
   /// Restarts the Flutter application and returns a structured result.
   ///
-  /// iOS does not provide a public API for automatic full process restart.
-  /// When iOS Flutter engine restart is configured in the host app,
-  /// [RestartMode.platformDefault] uses [RestartMode.flutterEngine]. The
-  /// legacy notification fallback is never used implicitly; request
-  /// [RestartMode.notificationFallback] explicitly if you accept that behavior.
-  static Future<RestartResult> restart({
+  /// By default, this uses the best supported behavior for the current
+  /// platform. Pass [mode] when you want a specific restart path, such as
+  /// [RestartMode.process], [RestartMode.flutterEngine], or
+  /// [RestartMode.notificationFallback].
+  ///
+  /// The [webOrigin] parameter is web-only. If null, the web implementation
+  /// uses the current browser origin. Pass a hash path such as `#/home` when
+  /// your web app uses hash routing.
+  ///
+  /// The [notificationTitle] and [notificationBody] parameters customize
+  /// [RestartMode.notificationFallback]. They do not make
+  /// [RestartMode.platformDefault] use the notification fallback.
+  ///
+  /// The [forceKill] parameter is Android-only. When true, the old process is
+  /// terminated after the new activity starts. [RestartMode.process] enables
+  /// this path automatically on Android.
+  static Future<RestartResult> restartApp({
     RestartMode mode = RestartMode.platformDefault,
     String? webOrigin,
     String? notificationTitle,
@@ -154,7 +165,6 @@ class Restart {
       notificationTitle: notificationTitle,
       notificationBody: notificationBody,
       forceKill: forceKill,
-      structuredResult: true,
     );
 
     try {
@@ -179,59 +189,12 @@ class Restart {
     }
   }
 
-  /// Restarts the Flutter application.
-  ///
-  /// The [webOrigin] parameter is optional and web-only. If null, the method
-  /// uses `window.origin` to reload the page. Use this when your current origin
-  /// differs from the app's origin. Supports hash URL strategy (e.g. `'#/home'`).
-  ///
-  /// The [notificationTitle] and [notificationBody] parameters customize
-  /// [RestartMode.notificationFallback] on iOS. They do not make
-  /// [RestartMode.platformDefault] use the notification fallback.
-  ///
-  /// iOS does not provide a public API for automatic full process restart.
-  /// Configure iOS Flutter engine restart in the host app for the recommended
-  /// same-process engine restart behavior.
-  ///
-  /// The [forceKill] parameter is Android-only. When true, the old process is
-  /// fully terminated after the new activity starts, preventing stale native
-  /// resource locks. Defaults to false.
-  ///
-  /// Returns true if the restart was initiated successfully.
-  static Future<bool> restartApp({
-    String? webOrigin,
-    String? notificationTitle,
-    String? notificationBody,
-    bool forceKill = false,
-    RestartMode mode = RestartMode.platformDefault,
-  }) async {
-    final args = _restartArgs(
-      mode: mode,
-      webOrigin: webOrigin,
-      notificationTitle: notificationTitle,
-      notificationBody: notificationBody,
-      forceKill: forceKill,
-      structuredResult: false,
-    );
-
-    try {
-      final result = await _channel.invokeMethod<dynamic>('restartApp', args);
-      if (result is Map) {
-        return result['success'] == true;
-      }
-      return result == 'ok';
-    } on PlatformException {
-      return false;
-    }
-  }
-
   static Map<String, dynamic> _restartArgs({
     required RestartMode mode,
     required String? webOrigin,
     required String? notificationTitle,
     required String? notificationBody,
     required bool forceKill,
-    required bool structuredResult,
   }) {
     return {
       'mode': mode.name,
@@ -239,7 +202,7 @@ class Restart {
       'notificationTitle': notificationTitle,
       'notificationBody': notificationBody,
       'forceKill': forceKill,
-      'structuredResult': structuredResult,
+      'structuredResult': true,
     };
   }
 }

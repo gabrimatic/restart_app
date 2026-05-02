@@ -12,7 +12,10 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       log.add(call);
-      return 'ok';
+      return <String, Object?>{
+        'success': true,
+        'mode': RestartMode.platformDefault.name,
+      };
     });
   });
 
@@ -22,12 +25,29 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  test('restartApp returns true on success', () async {
+  test('restartApp returns structured success result', () async {
     final result = await Restart.restartApp();
-    expect(result, isTrue);
+
+    expect(result.success, isTrue);
+    expect(result.mode, RestartMode.platformDefault);
+    expect(result.code, isNull);
+    expect(result.message, isNull);
   });
 
-  test('restartApp returns false on non-ok response', () async {
+  test('restartApp handles legacy ok response', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      log.add(call);
+      return 'ok';
+    });
+
+    final result = await Restart.restartApp(mode: RestartMode.process);
+
+    expect(result.success, isTrue);
+    expect(result.mode, RestartMode.process);
+  });
+
+  test('restartApp returns failure on unexpected response', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       log.add(call);
@@ -35,29 +55,35 @@ void main() {
     });
 
     final result = await Restart.restartApp();
-    expect(result, isFalse);
+
+    expect(result.success, isFalse);
+    expect(result.mode, RestartMode.platformDefault);
+    expect(result.code, 'UNKNOWN_RESULT');
   });
 
   test('restartApp sends correct method name', () async {
     await Restart.restartApp();
+
     expect(log, hasLength(1));
     expect(log.first.method, 'restartApp');
   });
 
   test('restartApp passes default arguments', () async {
     await Restart.restartApp();
+
     final args = log.first.arguments as Map;
     expect(args['mode'], RestartMode.platformDefault.name);
     expect(args['webOrigin'], isNull);
     expect(args['notificationTitle'], isNull);
     expect(args['notificationBody'], isNull);
     expect(args['forceKill'], isFalse);
-    expect(args['structuredResult'], isFalse);
+    expect(args['structuredResult'], isTrue);
     expect(args.containsKey('iosLegacyNotificationFallback'), isFalse);
   });
 
   test('restartApp passes webOrigin', () async {
     await Restart.restartApp(webOrigin: 'http://example.com');
+
     final args = log.first.arguments as Map;
     expect(args['webOrigin'], 'http://example.com');
   });
@@ -67,6 +93,7 @@ void main() {
       notificationTitle: 'Title',
       notificationBody: 'Body',
     );
+
     final args = log.first.arguments as Map;
     expect(args['notificationTitle'], 'Title');
     expect(args['notificationBody'], 'Body');
@@ -74,81 +101,51 @@ void main() {
 
   test('restartApp passes forceKill', () async {
     await Restart.restartApp(forceKill: true);
+
     final args = log.first.arguments as Map;
     expect(args['forceKill'], isTrue);
   });
 
   test('restartApp passes mode', () async {
     await Restart.restartApp(mode: RestartMode.flutterEngine);
+
     final args = log.first.arguments as Map;
     expect(args['mode'], RestartMode.flutterEngine.name);
   });
 
   test('restartApp passes all parameters together', () async {
     await Restart.restartApp(
+      mode: RestartMode.notificationFallback,
       webOrigin: '#/home',
       notificationTitle: 'Restart',
       notificationBody: 'Tap to reopen',
       forceKill: true,
     );
+
     final args = log.first.arguments as Map;
+    expect(args['mode'], RestartMode.notificationFallback.name);
     expect(args['webOrigin'], '#/home');
     expect(args['notificationTitle'], 'Restart');
     expect(args['notificationBody'], 'Tap to reopen');
     expect(args['forceKill'], isTrue);
   });
 
-  test('restartApp returns false on PlatformException', () async {
+  test('restartApp returns structured failure on PlatformException', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       throw PlatformException(
-        code: 'RESTART_FAILED',
-        message: 'No activity',
+        code: 'IOS_PROCESS_RESTART_UNSUPPORTED',
+        message: 'iOS does not provide process restart.',
       );
     });
 
-    final result = await Restart.restartApp();
-    expect(result, isFalse);
+    final result = await Restart.restartApp(mode: RestartMode.process);
+
+    expect(result.success, isFalse);
+    expect(result.mode, RestartMode.process);
+    expect(result.code, 'IOS_PROCESS_RESTART_UNSUPPORTED');
+    expect(result.message, 'iOS does not provide process restart.');
   });
-
-  test('restart returns structured result from map response', () async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
-      log.add(call);
-      return <String, Object?>{
-        'success': true,
-        'mode': RestartMode.flutterEngine.name,
-      };
-    });
-
-    final result = await Restart.restart(mode: RestartMode.flutterEngine);
-
-    expect(result.success, isTrue);
-    expect(result.mode, RestartMode.flutterEngine);
-    final args = log.first.arguments as Map;
-    expect(args['mode'], RestartMode.flutterEngine.name);
-    expect(args['structuredResult'], isTrue);
-    expect(args.containsKey('iosLegacyNotificationFallback'), isFalse);
-  });
-
-  test(
-    'restart returns false structured result on PlatformException',
-    () async {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-        throw PlatformException(
-          code: 'IOS_PROCESS_RESTART_UNSUPPORTED',
-          message: 'iOS does not provide process restart.',
-        );
-      });
-
-      final result = await Restart.restart(mode: RestartMode.process);
-
-      expect(result.success, isFalse);
-      expect(result.mode, RestartMode.process);
-      expect(result.code, 'IOS_PROCESS_RESTART_UNSUPPORTED');
-    },
-  );
 
   test('restartCapability parses platform response', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

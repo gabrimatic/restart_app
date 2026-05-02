@@ -8,8 +8,10 @@ void main() {
     );
 
     expect(find.text('Restart App Example'), findsOneWidget);
+    expect(find.text('Restart app'), findsOneWidget);
+    expect(find.text('Process restart'), findsOneWidget);
+    expect(find.text('iOS notification fallback'), findsOneWidget);
+    expect(find.text('Show capability'), findsOneWidget);
     expect(find.text('Run checks'), findsOneWidget);
-    expect(find.text('Restart Flutter engine'), findsOneWidget);
-    expect(find.text('Notification fallback'), findsOneWidget);
   });
 }

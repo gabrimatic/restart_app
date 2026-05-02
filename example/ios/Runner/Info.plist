@@ -2,22 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Add these key and array-->
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLName</key>
-			<!-- You can find it on /ios/project.pbxproj -'PRODUCT_BUNDLE_IDENTIFIER' -->
-			<string>gabrimatic.info.example</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>example</string>
-			</array>
-		</dict>
-	</array>
-	<!-- End -->
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
