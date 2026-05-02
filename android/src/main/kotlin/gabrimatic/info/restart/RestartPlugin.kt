@@ -57,50 +57,67 @@ class RestartPlugin :
         call: MethodCall,
         result: Result,
     ) {
-        if (call.method == "restartApp") {
-            val forceKill = call.argument<Boolean>("forceKill") ?: false
-            val currentActivity = activity
-
-            if (currentActivity == null) {
-                result.error("RESTART_FAILED", "No activity available", null)
-                return
+        when (call.method) {
+            "restartCapability" -> {
+                result.success(
+                    mapOf(
+                        "fullProcessRestart" to true,
+                        "flutterEngineRestart" to false,
+                        "notificationFallback" to false,
+                        "engineRestartConfigured" to false,
+                        "platformDefaultMode" to "process",
+                        "reason" to null,
+                    ),
+                )
             }
 
-            val pm = currentActivity.packageManager
-            val pkg = currentActivity.packageName
+            "restartApp" -> {
+                val forceKill = call.argument<Boolean>("forceKill") ?: false
+                val currentActivity = activity
 
-            // Try the standard launcher intent first, then fall back to the leanback
-            // launcher used by Android TV and Fire TV devices (API 21+).
-            var intent = pm.getLaunchIntentForPackage(pkg)
-            if (intent == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                intent = pm.getLeanbackLaunchIntentForPackage(pkg)
-            }
-
-            if (intent == null) {
-                result.error("RESTART_FAILED", "No launchable activity found for $pkg", null)
-                return
-            }
-
-            result.success("ok")
-
-            // Delay the destructive operations so the platform channel result can be delivered
-            // to the Dart side before the Flutter engine is torn down.
-            val delay = if (forceKill) 300L else 100L
-            Handler(Looper.getMainLooper()).postDelayed({
-                try {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                    currentActivity.startActivity(intent)
-                    if (forceKill) {
-                        Runtime.getRuntime().exit(0)
-                    } else {
-                        currentActivity.finishAffinity()
-                    }
-                } catch (e: Exception) {
-                    Log.e("RestartPlugin", "Restart failed: ${e.message}", e)
+                if (currentActivity == null) {
+                    result.error("RESTART_FAILED", "No activity available", null)
+                    return
                 }
-            }, delay)
-        } else {
-            result.notImplemented()
+
+                val pm = currentActivity.packageManager
+                val pkg = currentActivity.packageName
+
+                // Try the standard launcher intent first, then fall back to the leanback
+                // launcher used by Android TV and Fire TV devices (API 21+).
+                var intent = pm.getLaunchIntentForPackage(pkg)
+                if (intent == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    intent = pm.getLeanbackLaunchIntentForPackage(pkg)
+                }
+
+                if (intent == null) {
+                    result.error("RESTART_FAILED", "No launchable activity found for $pkg", null)
+                    return
+                }
+
+                result.success("ok")
+
+                // Delay the destructive operations so the platform channel result can be delivered
+                // to the Dart side before the Flutter engine is torn down.
+                val delay = if (forceKill) 300L else 100L
+                Handler(Looper.getMainLooper()).postDelayed({
+                    try {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        currentActivity.startActivity(intent)
+                        if (forceKill) {
+                            Runtime.getRuntime().exit(0)
+                        } else {
+                            currentActivity.finishAffinity()
+                        }
+                    } catch (e: Exception) {
+                        Log.e("RestartPlugin", "Restart failed: ${e.message}", e)
+                    }
+                }, delay)
+            }
+
+            else -> {
+                result.notImplemented()
+            }
         }
     }
 

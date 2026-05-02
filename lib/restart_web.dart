@@ -34,6 +34,15 @@ class RestartWeb {
   /// Otherwise, throws a [PlatformException] for unrecognized method calls.
   Future<dynamic> handleMethodCall(MethodCall call) async {
     switch (call.method) {
+      case 'restartCapability':
+        return <String, Object?>{
+          'fullProcessRestart': false,
+          'flutterEngineRestart': false,
+          'notificationFallback': false,
+          'engineRestartConfigured': false,
+          'platformDefaultMode': 'platformDefault',
+          'reason': 'Web restart reloads the current page.',
+        };
       case 'restartApp':
         final args = call.arguments as Map?;
         final webOrigin = args?['webOrigin'] as String?;

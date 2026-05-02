@@ -1,6 +1,6 @@
 PODS:
   - Flutter (1.0.0)
-  - restart_app (0.0.1):
+  - restart_app (1.7.3):
     - Flutter
 
 DEPENDENCIES:
@@ -14,9 +14,9 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/restart_app/ios"
 
 SPEC CHECKSUMS:
-  Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
-  restart_app: 806659942bf932f6ce51c5372f91ce5e81c8c14a
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  restart_app: cab057e3e2a21d64a22df04eab057b6158f59cc1
 
-PODFILE CHECKSUM: 819463e6a0290f5a72f145ba7cde16e8b6ef0796
+PODFILE CHECKSUM: 4f1c12611da7338d21589c0b2ecd6bd20b109694
 
-COCOAPODS: 1.14.3
+COCOAPODS: 1.16.2

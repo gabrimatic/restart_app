@@ -1,41 +1,37 @@
 import UIKit
 import Flutter
+import restart_app
 
-@UIApplicationMain
+@main
 @objc class AppDelegate: FlutterAppDelegate {
     var flutterEngine: FlutterEngine?
-
-    func restartFlutterApp() {
-        // Remove the current FlutterViewController
-        if let window = self.window {
-            window.rootViewController = nil
-        }
-
-        // Create a new FlutterEngine
-        flutterEngine = FlutterEngine(name: "io.flutter")
-        flutterEngine?.run()
-
-        // Re-register plugins with the new engine
-        GeneratedPluginRegistrant.register(with: flutterEngine!)
-
-        // Create a new FlutterViewController with the new engine
-        let flutterViewController = FlutterViewController(engine: flutterEngine!, nibName: nil, bundle: nil)
-
-        // Set the new FlutterViewController as rootViewController
-        if let window = self.window {
-            window.rootViewController = flutterViewController
-            window.makeKeyAndVisible()
-        }
-    }
 
     override func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        flutterEngine = FlutterEngine(name: "io.flutter")
-        flutterEngine?.run()
-        GeneratedPluginRegistrant.register(with: self.flutterEngine!)
-        let flutterViewController = FlutterViewController(engine: flutterEngine!, nibName: nil, bundle: nil)
+        RestartAppPlugin.setEngineFactory({ [weak self] in
+            let engine = FlutterEngine(name: "restart_app_example_engine")
+
+            guard engine.run() else {
+                throw NSError(
+                    domain: "restart_app",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to run FlutterEngine"]
+                )
+            }
+
+            GeneratedPluginRegistrant.register(with: engine)
+            self?.flutterEngine = engine
+            return engine
+        })
+
+        let initialEngine = FlutterEngine(name: "restart_app_example_initial_engine")
+        initialEngine.run()
+        GeneratedPluginRegistrant.register(with: initialEngine)
+        flutterEngine = initialEngine
+
+        let flutterViewController = FlutterViewController(engine: initialEngine, nibName: nil, bundle: nil)
         self.window = UIWindow(frame: UIScreen.main.bounds)
         self.window?.rootViewController = flutterViewController
         self.window?.makeKeyAndVisible()

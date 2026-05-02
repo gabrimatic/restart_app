@@ -36,6 +36,24 @@ RestartAppPlugin::~RestartAppPlugin() {}
 void RestartAppPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  if (method_call.method_name() == "restartCapability") {
+    flutter::EncodableMap capability = {
+        {flutter::EncodableValue("fullProcessRestart"),
+         flutter::EncodableValue(true)},
+        {flutter::EncodableValue("flutterEngineRestart"),
+         flutter::EncodableValue(false)},
+        {flutter::EncodableValue("notificationFallback"),
+         flutter::EncodableValue(false)},
+        {flutter::EncodableValue("engineRestartConfigured"),
+         flutter::EncodableValue(false)},
+        {flutter::EncodableValue("platformDefaultMode"),
+         flutter::EncodableValue("process")},
+        {flutter::EncodableValue("reason"), flutter::EncodableValue()},
+    };
+    result->Success(flutter::EncodableValue(capability));
+    return;
+  }
+
   if (method_call.method_name() != "restartApp") {
     result->NotImplemented();
     return;

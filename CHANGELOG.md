@@ -1,3 +1,10 @@
+## 1.8.0
+
+* Added structured restart API with `Restart.restart()`, `RestartResult`, `RestartMode`, and `Restart.restartCapability()`
+* Added opt-in iOS Flutter engine restart that creates a fresh `FlutterEngine`, re-runs Dart, re-registers plugins through the host app, and replaces the root `FlutterViewController`
+* Kept the existing iOS notification + `exit(0)` behavior as an explicit legacy fallback
+* Updated iOS documentation to distinguish Flutter engine restart from unsupported full process restart
+
 ## 1.7.3
 
 * Fixed Xcode build failure caused by SPM target path resolving outside the package root ([#52](https://github.com/gabrimatic/restart_app/issues/52))

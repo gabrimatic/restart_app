@@ -51,8 +51,8 @@ class HomePage extends StatelessWidget {
       body: Center(
         child: FilledButton(
           child: const Text('Restart!'),
-          onPressed: () {
-            Restart.restartApp(
+          onPressed: () async {
+            final result = await Restart.restart(
               /// In Web Platform, Fill webOrigin only when your new origin is different than the app's origin
               // webOrigin: 'http://example.com',
 
@@ -60,6 +60,14 @@ class HomePage extends StatelessWidget {
               notificationTitle: 'Restarting App',
               notificationBody: 'Please tap here to open the app again.',
             );
+
+            if (!result.success) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(result.message ?? 'Restart failed'),
+                ),
+              );
+            }
           },
         ),
       ),

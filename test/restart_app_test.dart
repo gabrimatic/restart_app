@@ -47,10 +47,13 @@ void main() {
   test('restartApp passes default arguments', () async {
     await Restart.restartApp();
     final args = log.first.arguments as Map;
+    expect(args['mode'], RestartMode.platformDefault.name);
     expect(args['webOrigin'], isNull);
     expect(args['notificationTitle'], isNull);
     expect(args['notificationBody'], isNull);
     expect(args['forceKill'], isFalse);
+    expect(args['structuredResult'], isFalse);
+    expect(args['iosLegacyNotificationFallback'], isTrue);
   });
 
   test('restartApp passes webOrigin', () async {
@@ -75,6 +78,12 @@ void main() {
     expect(args['forceKill'], isTrue);
   });
 
+  test('restartApp passes mode', () async {
+    await Restart.restartApp(mode: RestartMode.flutterEngine);
+    final args = log.first.arguments as Map;
+    expect(args['mode'], RestartMode.flutterEngine.name);
+  });
+
   test('restartApp passes all parameters together', () async {
     await Restart.restartApp(
       webOrigin: '#/home',
@@ -92,10 +101,94 @@ void main() {
   test('restartApp returns false on PlatformException', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
-      throw PlatformException(code: 'RESTART_FAILED', message: 'No activity');
+      throw PlatformException(
+        code: 'RESTART_FAILED',
+        message: 'No activity',
+      );
     });
 
     final result = await Restart.restartApp();
     expect(result, isFalse);
+  });
+
+  test('restart returns structured result from map response', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      log.add(call);
+      return <String, Object?>{
+        'success': true,
+        'mode': RestartMode.flutterEngine.name,
+      };
+    });
+
+    final result = await Restart.restart(mode: RestartMode.flutterEngine);
+
+    expect(result.success, isTrue);
+    expect(result.mode, RestartMode.flutterEngine);
+    final args = log.first.arguments as Map;
+    expect(args['mode'], RestartMode.flutterEngine.name);
+    expect(args['structuredResult'], isTrue);
+    expect(args['iosLegacyNotificationFallback'], isFalse);
+  });
+
+  test(
+    'restart returns false structured result on PlatformException',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        throw PlatformException(
+          code: 'IOS_PROCESS_RESTART_UNSUPPORTED',
+          message: 'iOS does not provide process restart.',
+        );
+      });
+
+      final result = await Restart.restart(mode: RestartMode.process);
+
+      expect(result.success, isFalse);
+      expect(result.mode, RestartMode.process);
+      expect(result.code, 'IOS_PROCESS_RESTART_UNSUPPORTED');
+    },
+  );
+
+  test('restartCapability parses platform response', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      log.add(call);
+      return <String, Object?>{
+        'fullProcessRestart': false,
+        'flutterEngineRestart': true,
+        'notificationFallback': true,
+        'engineRestartConfigured': true,
+        'platformDefaultMode': RestartMode.flutterEngine.name,
+      };
+    });
+
+    final capability = await Restart.restartCapability();
+
+    expect(log.first.method, 'restartCapability');
+    expect(capability.fullProcessRestart, isFalse);
+    expect(capability.flutterEngineRestart, isTrue);
+    expect(capability.notificationFallback, isTrue);
+    expect(capability.engineRestartConfigured, isTrue);
+    expect(capability.platformDefaultMode, RestartMode.flutterEngine);
+  });
+
+  test('restartCapability returns unavailable on PlatformException', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      throw PlatformException(
+        code: 'Unimplemented',
+        message: 'Capability unavailable.',
+      );
+    });
+
+    final capability = await Restart.restartCapability();
+
+    expect(capability.fullProcessRestart, isFalse);
+    expect(capability.flutterEngineRestart, isFalse);
+    expect(capability.notificationFallback, isFalse);
+    expect(capability.engineRestartConfigured, isFalse);
+    expect(capability.platformDefaultMode, RestartMode.platformDefault);
+    expect(capability.reason, 'Capability unavailable.');
   });
 }

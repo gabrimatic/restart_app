@@ -9,7 +9,16 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    if call.method == "restartApp" {
+    if call.method == "restartCapability" {
+      result([
+        "fullProcessRestart": true,
+        "flutterEngineRestart": false,
+        "notificationFallback": false,
+        "engineRestartConfigured": false,
+        "platformDefaultMode": "process",
+        "reason": NSNull(),
+      ])
+    } else if call.method == "restartApp" {
       let url = Bundle.main.bundleURL
       let config = NSWorkspace.OpenConfiguration()
       config.createsNewApplicationInstance = true

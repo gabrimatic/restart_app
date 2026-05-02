@@ -62,11 +62,35 @@ static gboolean do_restart(gpointer user_data) {
   _exit(1);
 }
 
+static void respond_restart_capability(FlMethodCall *method_call) {
+  g_autoptr(FlValue) result = fl_value_new_map();
+  fl_value_set_string_take(result, "fullProcessRestart",
+                           fl_value_new_bool(TRUE));
+  fl_value_set_string_take(result, "flutterEngineRestart",
+                           fl_value_new_bool(FALSE));
+  fl_value_set_string_take(result, "notificationFallback",
+                           fl_value_new_bool(FALSE));
+  fl_value_set_string_take(result, "engineRestartConfigured",
+                           fl_value_new_bool(FALSE));
+  fl_value_set_string_take(result, "platformDefaultMode",
+                           fl_value_new_string("process"));
+  fl_value_set_string_take(result, "reason", fl_value_new_null());
+
+  g_autoptr(FlMethodResponse) response =
+      FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+  g_autoptr(GError) error = nullptr;
+  if (!fl_method_call_respond(method_call, response, &error)) {
+    g_warning("restart_app: failed to send response: %s", error->message);
+  }
+}
+
 static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
                            gpointer user_data) {
   const gchar *method = fl_method_call_get_name(method_call);
 
-  if (strcmp(method, "restartApp") == 0) {
+  if (strcmp(method, "restartCapability") == 0) {
+    respond_restart_capability(method_call);
+  } else if (strcmp(method, "restartApp") == 0) {
     // Validate that the executable is resolvable and accessible before
     // responding with success. Once "ok" is sent, failures are silent.
     char exe_path[PATH_MAX];
