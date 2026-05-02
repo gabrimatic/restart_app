@@ -1,6 +1,6 @@
 name: restart_app
 description: A Flutter plugin to restart or relaunch Flutter apps with platform-specific behavior, including opt-in iOS Flutter engine restart.
-version: 1.8.1
+version: 1.8.2
 homepage: https://gabrimatic.info
 repository: https://github.com/gabrimatic/restart_app
 issue_tracker: https://github.com/gabrimatic/restart_app/issues

@@ -14,14 +14,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 
-/**
- * `RestartPlugin` class provides a method to restart a Flutter application in Android.
- *
- * It uses the Flutter platform channels to communicate with the Flutter code.
- * Specifically, it uses a `MethodChannel` named 'restart' for this communication.
- *
- * The main functionality is provided by the `onMethodCall` method.
- */
+/** Android implementation for the `restart` platform channel. */
 class RestartPlugin :
     FlutterPlugin,
     MethodCallHandler,
@@ -29,20 +22,14 @@ class RestartPlugin :
     private lateinit var channel: MethodChannel
     private var activity: Activity? = null
 
-    /**
-     * Called when the plugin is attached to the Flutter engine.
-     *
-     * Sets this plugin instance as the handler for method calls from Flutter.
-     */
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "restart")
         channel.setMethodCallHandler(this)
     }
 
     /**
-     * Handles method calls from the Flutter code.
+     * Handles platform-channel calls from the Dart API.
      *
-     * If the method call is 'restartApp', it restarts the app and sends a successful result.
      * The result is sent before the restart is triggered so the Flutter engine has time to
      * deliver it across the platform channel. Without this delay, finishAffinity() can tear
      * down the engine mid-delivery, causing a FlutterJNI detached error.
@@ -50,8 +37,6 @@ class RestartPlugin :
      * When forceKill is true, the process is terminated immediately after the new activity
      * launches, ensuring a clean cold restart with no stale native resources. A longer delay
      * gives the new activity time to initialize before the current process exits.
-     *
-     * For any other method call, it sends a 'not implemented' result.
      */
     override fun onMethodCall(
         call: MethodCall,
@@ -142,11 +127,6 @@ class RestartPlugin :
         }
     }
 
-    /**
-     * Called when the plugin is detached from the Flutter engine.
-     *
-     * It removes the handler for method calls from Flutter.
-     */
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
     }

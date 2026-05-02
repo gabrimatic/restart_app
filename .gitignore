@@ -9,3 +9,7 @@ build/
 
 *.iml
 .idea/
+
+# Local QA
+bugs.md
+test_apps/

@@ -9,12 +9,25 @@ environment:
   sdk: ^3.4.0
 
 dependencies:
+  cached_network_image: ^3.4.1
+  connectivity_plus: ^7.1.1
+  cupertino_icons: ^1.0.8
+  device_info_plus: ^13.1.0
   flutter:
     sdk: flutter
+  flutter_cache_manager: ^3.4.1
+  flutter_svg: ^2.2.4
   flutter_web_plugins:
     sdk: flutter
+  http: ^1.6.0
+  package_info_plus: ^10.1.0
+  path_provider: ^2.1.5
   restart_app:
     path: ../
+  shared_preferences: ^2.5.5
+  sqflite: ^2.4.2+1
+  url_launcher: ^6.3.2
+  webview_flutter: ^4.13.1
 
 dev_dependencies:
   flutter_test:

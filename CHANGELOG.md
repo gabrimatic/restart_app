@@ -1,3 +1,11 @@
+## 1.8.2
+
+* Made iOS `restartApp()` fail cleanly when Flutter engine restart is not configured instead of implicitly using the legacy notification fallback
+* Kept the iOS notification fallback available only through explicit `RestartMode.notificationFallback`
+* Removed the internal implicit-fallback argument from the Dart API and iOS plugin channel handling
+* Expanded the example app with restart checks for common Flutter packages
+* Updated README wording to make the no-implicit-workaround iOS behavior clear
+
 ## 1.8.1
 
 * Fixed restart mode handling so unsupported modes fail instead of silently using a platform default

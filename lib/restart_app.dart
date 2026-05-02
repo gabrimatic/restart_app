@@ -110,15 +110,8 @@ class RestartResult {
   }
 }
 
-/// `Restart` class provides a method to restart a Flutter application.
-///
-/// It uses the Flutter platform channels to communicate with the platform-specific code.
-/// Specifically, it uses a `MethodChannel` named 'restart' for this communication.
-///
-/// The main functionality is provided by the `restartApp` method.
+/// Entry point for restart and relaunch operations.
 class Restart {
-  /// A private constant `MethodChannel`. This channel is used to communicate with the
-  /// platform-specific code to perform the restart operation.
   static const MethodChannel _channel = MethodChannel('restart');
 
   /// Returns the restart behavior available on the current platform.
@@ -145,16 +138,15 @@ class Restart {
   ///
   /// iOS does not provide a public API for automatic full process restart.
   /// When iOS Flutter engine restart is configured in the host app,
-  /// [RestartMode.platformDefault] uses [RestartMode.flutterEngine]. Otherwise
-  /// use [RestartMode.notificationFallback] only when the legacy notification
-  /// workaround is acceptable for your app.
+  /// [RestartMode.platformDefault] uses [RestartMode.flutterEngine]. The
+  /// legacy notification fallback is never used implicitly; request
+  /// [RestartMode.notificationFallback] explicitly if you accept that behavior.
   static Future<RestartResult> restart({
     RestartMode mode = RestartMode.platformDefault,
     String? webOrigin,
     String? notificationTitle,
     String? notificationBody,
     bool forceKill = false,
-    bool iosLegacyNotificationFallback = false,
   }) async {
     final args = _restartArgs(
       mode: mode,
@@ -163,7 +155,6 @@ class Restart {
       notificationBody: notificationBody,
       forceKill: forceKill,
       structuredResult: true,
-      iosLegacyNotificationFallback: iosLegacyNotificationFallback,
     );
 
     try {
@@ -194,10 +185,13 @@ class Restart {
   /// uses `window.origin` to reload the page. Use this when your current origin
   /// differs from the app's origin. Supports hash URL strategy (e.g. `'#/home'`).
   ///
-  /// The [notificationTitle] and [notificationBody] parameters customize the
-  /// iOS legacy notification fallback. iOS does not provide a public API for
-  /// automatic full process restart. Configure iOS Flutter engine restart in
-  /// the host app for the recommended same-process engine restart behavior.
+  /// The [notificationTitle] and [notificationBody] parameters customize
+  /// [RestartMode.notificationFallback] on iOS. They do not make
+  /// [RestartMode.platformDefault] use the notification fallback.
+  ///
+  /// iOS does not provide a public API for automatic full process restart.
+  /// Configure iOS Flutter engine restart in the host app for the recommended
+  /// same-process engine restart behavior.
   ///
   /// The [forceKill] parameter is Android-only. When true, the old process is
   /// fully terminated after the new activity starts, preventing stale native
@@ -218,7 +212,6 @@ class Restart {
       notificationBody: notificationBody,
       forceKill: forceKill,
       structuredResult: false,
-      iosLegacyNotificationFallback: true,
     );
 
     try {
@@ -239,7 +232,6 @@ class Restart {
     required String? notificationBody,
     required bool forceKill,
     required bool structuredResult,
-    required bool iosLegacyNotificationFallback,
   }) {
     return {
       'mode': mode.name,
@@ -248,7 +240,6 @@ class Restart {
       'notificationBody': notificationBody,
       'forceKill': forceKill,
       'structuredResult': structuredResult,
-      'iosLegacyNotificationFallback': iosLegacyNotificationFallback,
     };
   }
 }

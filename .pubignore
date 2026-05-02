@@ -1,5 +1,10 @@
 .github/
 build/
+example/build/
+example/.dart_tool/
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 SECURITY.md
+bugs.md
+test_apps/
+.dart_tool/

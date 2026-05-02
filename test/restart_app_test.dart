@@ -53,7 +53,7 @@ void main() {
     expect(args['notificationBody'], isNull);
     expect(args['forceKill'], isFalse);
     expect(args['structuredResult'], isFalse);
-    expect(args['iosLegacyNotificationFallback'], isTrue);
+    expect(args.containsKey('iosLegacyNotificationFallback'), isFalse);
   });
 
   test('restartApp passes webOrigin', () async {
@@ -128,7 +128,7 @@ void main() {
     final args = log.first.arguments as Map;
     expect(args['mode'], RestartMode.flutterEngine.name);
     expect(args['structuredResult'], isTrue);
-    expect(args['iosLegacyNotificationFallback'], isFalse);
+    expect(args.containsKey('iosLegacyNotificationFallback'), isFalse);
   });
 
   test(

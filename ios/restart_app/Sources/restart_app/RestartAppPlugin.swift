@@ -162,7 +162,6 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
     let modeName = args["mode"] as? String ?? IOSRestartMode.platformDefault.rawValue
     let mode = IOSRestartMode(rawValue: modeName) ?? .platformDefault
     let structuredResult = args["structuredResult"] as? Bool ?? false
-    let legacyNotificationFallback = args["iosLegacyNotificationFallback"] as? Bool ?? false
 
     switch mode {
     case .process:
@@ -179,13 +178,6 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
     case .platformDefault:
       if Self.engineFactory != nil {
         scheduleEngineRestart(result: result, structuredResult: structuredResult)
-      } else if legacyNotificationFallback {
-        scheduleNotificationFallback(
-          args: args,
-          result: result,
-          structuredResult: structuredResult,
-          resolvedMode: .notificationFallback
-        )
       } else {
         result(IOSRestartError.engineRestartNotConfigured.flutterError)
       }

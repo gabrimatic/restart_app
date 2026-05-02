@@ -4,7 +4,7 @@
 
 Restart or relaunch your Flutter app with a single function call.
 
-Android, macOS, Linux, and Windows use platform-specific relaunch behavior. Web reloads the page. iOS does not provide a public API for automatic full process restart, so `restart_app` supports an opt-in Flutter engine restart and keeps the old notification-based flow as an explicit legacy fallback.
+Android, macOS, Linux, and Windows use platform-specific relaunch behavior. Web reloads the page. iOS does not provide a public API for automatic full process restart, so `restart_app` supports an opt-in Flutter engine restart. The old notification-based iOS flow is available only when explicitly requested.
 
 ## Quick start
 
@@ -12,7 +12,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  restart_app: ^1.8.1
+  restart_app: ^1.8.2
 ```
 
 Import and call:
@@ -23,7 +23,7 @@ import 'package:restart_app/restart_app.dart';
 final restarted = await Restart.restartApp();
 ```
 
-Returns `true` if the restart was initiated. Returns `false` on failure (permission denied, missing executable, no launchable activity).
+Returns `true` if the restart was initiated. Returns `false` on failure (missing iOS engine-restart configuration, missing executable, no launchable activity).
 
 For structured errors and capabilities, use the newer API:
 
@@ -43,8 +43,8 @@ if (!result.success) {
 |-----------|----------|-------------|
 | `mode` | All | Requested restart behavior: `platformDefault`, `flutterEngine`, `process`, or `notificationFallback`. |
 | `webOrigin` | Web | Custom origin URL for the reload. Defaults to `window.origin`. Supports hash strategy (e.g. `'#/home'`). |
-| `notificationTitle` | iOS | Title of the local notification shown by the legacy notification fallback. |
-| `notificationBody` | iOS | Body of the local notification shown by the legacy notification fallback. |
+| `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. |
+| `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. |
 | `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |
 
 ## Platform behavior
@@ -65,7 +65,7 @@ iOS does not provide a public API for an app to terminate itself and automatical
 `restart_app` supports two iOS behaviors:
 
 1. **Flutter engine restart**, recommended. This keeps the iOS process alive, creates a new `FlutterEngine`, runs the Dart entrypoint again, re-registers plugins through the host app's `GeneratedPluginRegistrant`, creates a new `FlutterViewController`, replaces the active root view controller, and destroys the old engine context.
-2. **Notification fallback**, legacy. This schedules a local notification, calls `exit(0)`, and requires the user to tap the notification to reopen the app. This is not a true restart and is not recommended as normal product behavior.
+2. **Notification fallback**, legacy and explicit only. This schedules a local notification, calls `exit(0)`, and requires the user to tap the notification to reopen the app. This is not a true restart and is not recommended as normal product behavior.
 
 ### Configure Flutter engine restart
 
@@ -107,6 +107,7 @@ final result = await Restart.restart(
 ```
 
 `RestartMode.platformDefault` uses Flutter engine restart on iOS when this setup is present.
+If this setup is missing, `platformDefault` fails cleanly on iOS instead of falling back to notification + `exit(0)`.
 
 ### iOS capabilities
 

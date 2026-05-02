@@ -1,22 +1,12 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
-// In order to *not* need this ignore, consider extracting the "web" version
-// of your plugin as a separate package, instead of inlining it in the same
-// package as the core of your plugin.
+
 // ignore: avoid_web_libraries_in_flutter
 import 'package:web/web.dart' as web show window;
 
-/// `RestartWeb` provides a web implementation of the `Restart` plugin.
-///
-/// It registers a `MethodChannel` named 'restart' for communication between the Flutter code
-/// and the platform-specific web code.
-///
-/// The main functionality is provided by the `restart` method.
+/// Web implementation for the `restart` platform channel.
 class RestartWeb {
-  /// Registers this plugin with the given `registrar`.
-  ///
-  /// This creates a `MethodChannel` named 'restart', and sets the method call handler to
-  /// this plugin's `handleMethodCall` method.
+  /// Registers the web plugin.
   static void registerWith(Registrar registrar) {
     final MethodChannel channel = MethodChannel(
       'restart',
@@ -28,10 +18,7 @@ class RestartWeb {
     channel.setMethodCallHandler(pluginInstance.handleMethodCall);
   }
 
-  /// Handles method calls from the Flutter code.
-  ///
-  /// If the method call is 'restartApp', it calls the `restart` method with the given `webOrigin`.
-  /// Otherwise, throws a [PlatformException] for unrecognized method calls.
+  /// Handles platform-channel calls from the Dart API.
   Future<dynamic> handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'restartCapability':
@@ -70,7 +57,7 @@ class RestartWeb {
     }
   }
 
-  /// Restarts the web app.
+  /// Reloads or replaces the current browser location.
   ///
   /// The `webOrigin` parameter is optional. If it's null, the method uses the `window.origin`
   /// to get the site origin. This parameter should only be filled when your current origin
