@@ -1,0 +1,34 @@
+---
+title: Background isolates
+description: Route restart requests through the main isolate.
+---
+
+`Restart.restartApp()` uses a platform channel and must run on the main isolate.
+
+Calling it from a background isolate throws:
+
+```text
+Bad state: The BackgroundIsolateBinaryMessenger.instance value is invalid
+until BackgroundIsolateBinaryMessenger.ensureInitialized is executed.
+```
+
+Send a message from the background isolate to the main isolate instead.
+
+```dart
+// Main isolate: listen for restart signals.
+final receivePort = ReceivePort();
+receivePort.listen((message) {
+  if (message == 'restart') {
+    Restart.restartApp();
+  }
+});
+
+// Spawn the isolate with the SendPort.
+await Isolate.spawn(myIsolateFunction, receivePort.sendPort);
+
+// Background isolate: signal instead of calling restartApp() directly.
+void myIsolateFunction(SendPort sendPort) {
+  // ... your background work ...
+  sendPort.send('restart');
+}
+```

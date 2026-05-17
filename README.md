@@ -4,7 +4,7 @@
 
 Restart or relaunch your Flutter app from Dart with one call.
 
-Each platform uses the safest supported restart path available to Flutter apps. See [Platform behavior](#platform-behavior) for the exact native mechanism on each target.
+Each platform uses the safest supported restart path available to Flutter apps. See the [published docs](https://gabrimatic.github.io/restart_app/) for guides, reference, and deployment details. The [platform behavior guide](https://gabrimatic.github.io/restart_app/product/platform-behavior/) covers the exact native mechanism on each target.
 
 ## Quick start
 

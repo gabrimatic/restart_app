@@ -1,0 +1,59 @@
+---
+title: API reference
+description: Dart API surface for restart_app.
+---
+
+## Restart.restartApp
+
+Restarts the Flutter application and returns a structured result.
+
+```dart
+static Future<RestartResult> restartApp({
+  RestartMode mode = RestartMode.platformDefault,
+  String? webOrigin,
+  String? notificationTitle,
+  String? notificationBody,
+  bool forceKill = false,
+})
+```
+
+By default, this uses the best supported behavior for the current platform. Pass `mode` when you want a specific restart path, such as `RestartMode.process`, `RestartMode.flutterEngine`, or `RestartMode.notificationFallback`.
+
+## Restart.restartCapability
+
+Returns the restart behavior available on the current platform.
+
+```dart
+static Future<RestartCapability> restartCapability()
+```
+
+Use this when your app should adapt UI or behavior to the current platform.
+
+## RestartMode
+
+| Value | Description |
+| --- | --- |
+| `platformDefault` | Uses the best behavior available for the current platform. |
+| `flutterEngine` | Recreates the Flutter engine in the same native process where supported. |
+| `process` | Requests a native process relaunch where the platform supports it. |
+| `notificationFallback` | iOS-only legacy fallback that schedules a local notification, exits, and requires the user to tap the notification to reopen the app. |
+
+## RestartResult
+
+| Field | Description |
+| --- | --- |
+| `success` | Whether the platform accepted and initiated the requested restart. |
+| `mode` | The mode that was accepted by the platform. |
+| `code` | Platform-specific error code when `success` is false. |
+| `message` | Platform-specific error message when `success` is false. |
+
+## RestartCapability
+
+| Field | Description |
+| --- | --- |
+| `fullProcessRestart` | Whether this platform can relaunch the app in a fresh native process. |
+| `flutterEngineRestart` | Whether this platform can recreate Flutter in the current native process. |
+| `notificationFallback` | Whether notification fallback is available on the current platform. |
+| `engineRestartConfigured` | Whether Flutter engine restart has been configured by the host app. |
+| `platformDefaultMode` | The behavior used by `RestartMode.platformDefault`. |
+| `reason` | Optional explanation when a capability is unavailable or limited. |

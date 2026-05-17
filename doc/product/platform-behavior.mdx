@@ -1,0 +1,29 @@
+---
+title: Platform behavior
+description: Native restart mechanism and platform limits for each supported Flutter target.
+---
+
+`restart_app` uses different mechanisms because Flutter targets do not expose the same restart primitives.
+
+| Platform | Mechanism | Limitations |
+| --- | --- | --- |
+| Android | Relaunches the main activity through `PackageManager`. Supports Android TV and Fire TV through a leanback launcher fallback. `RestartMode.process` and `forceKill: true` kill the process after launch for a clean cold start. | None |
+| iOS | Recommended: opt-in Flutter engine restart that creates a new `FlutterEngine`, runs Dart again, re-registers plugins, and replaces the root `FlutterViewController` in the same iOS process. Legacy: local notification, `exit(0)`, and user tap. | iOS has no public API for automatic full process restart. Engine restart is not a process restart and cannot reset native singleton state. Legacy fallback requires notification permission and user action. |
+| Web | Reloads the page using `window.location`. | None |
+| macOS | Launches a new instance through `NSWorkspace` and terminates the current process. | Sandboxed Mac App Store builds cannot launch new instances of themselves. The package returns a failed result in this case. |
+| Linux | Replaces the current process through `execv`. | None |
+| Windows | Launches a new instance through `CreateProcess` and terminates the current process. | MSIX-packaged Microsoft Store apps cannot be relaunched through `CreateProcess`. |
+
+## Choose a mode
+
+Use `RestartMode.platformDefault` unless your app has a reason to request a specific behavior.
+
+```dart
+await Restart.restartApp(mode: RestartMode.platformDefault);
+```
+
+Use `RestartMode.process` when you explicitly want a full process relaunch on platforms that support it.
+
+Use `RestartMode.flutterEngine` on iOS when the host app has configured engine restart.
+
+Use `RestartMode.notificationFallback` only when the iOS user-tap relaunch tradeoff is acceptable.

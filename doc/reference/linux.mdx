@@ -1,0 +1,19 @@
+---
+title: Linux
+description: Preserve command-line arguments across Linux process replacement.
+---
+
+On Linux, `restart_app` replaces the current process through `execv`.
+
+By default, the restarted process launches without the original command-line arguments. To preserve them, call `restart_app_plugin_store_argv` in your `linux/main.cc` before running the Flutter engine:
+
+```cpp
+#include <restart_app/restart_app_plugin.h>
+
+int main(int argc, char** argv) {
+  restart_app_plugin_store_argv(argc, argv);
+  // ... rest of main()
+}
+```
+
+Most Flutter apps do not rely on command-line arguments, so this step is optional.

@@ -1,0 +1,24 @@
+---
+title: Configuration
+description: Optional parameters for restart_app restart behavior.
+---
+
+Default behavior works for normal app restart flows. Pass options only when your app needs a specific platform behavior.
+
+```dart
+await Restart.restartApp(
+  mode: RestartMode.platformDefault,
+  webOrigin: '#/home',
+  forceKill: false,
+  notificationTitle: 'Restart',
+  notificationBody: 'Tap to reopen the app.',
+);
+```
+
+| Parameter | Platform | Description |
+| --- | --- | --- |
+| `mode` | All | Requested restart behavior: `platformDefault`, `flutterEngine`, `process`, or `notificationFallback`. |
+| `webOrigin` | Web | Custom origin URL for the reload. Defaults to `window.origin`. Supports hash strategy, for example `#/home`. |
+| `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Restart`. |
+| `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Tap to reopen the app.` |
+| `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |

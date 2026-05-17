@@ -1,0 +1,103 @@
+---
+title: iOS engine restart
+description: Configure the supported same-process Flutter engine restart path on iOS.
+---
+
+iOS does not provide a public API for an app to terminate itself and automatically launch a fresh process of the same app. Android-style full process restart is not available on iOS with public APIs.
+
+`restart_app` supports two iOS behaviors:
+
+1. Flutter engine restart, recommended.
+2. Notification fallback, legacy and explicit only.
+
+## Configure the host app
+
+The host app owns `GeneratedPluginRegistrant`, so iOS engine restart requires one app-side setup step.
+
+In `ios/Runner/AppDelegate.swift`:
+
+```swift
+import UIKit
+import Flutter
+import restart_app
+
+@UIApplicationMain
+@objc class AppDelegate: FlutterAppDelegate {
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
+    RestartAppPlugin.configureEngineRestart { engine in
+      GeneratedPluginRegistrant.register(with: engine)
+    }
+
+    GeneratedPluginRegistrant.register(with: self)
+
+    return super.application(
+      application,
+      didFinishLaunchingWithOptions: launchOptions
+    )
+  }
+}
+```
+
+Then call:
+
+```dart
+final result = await Restart.restartApp();
+```
+
+`RestartMode.platformDefault` uses Flutter engine restart on iOS when this setup is present. If this setup is missing, `platformDefault` fails cleanly on iOS instead of falling back to notification plus `exit(0)`.
+
+To request the engine path explicitly:
+
+```dart
+final result = await Restart.restartApp(
+  mode: RestartMode.flutterEngine,
+);
+```
+
+## What gets reset
+
+Engine restart resets:
+
+- Dart root isolate
+- Flutter widget tree
+- Flutter engine-owned platform channels
+- Flutter plugin registrations for the new engine
+- Platform-view factory registrations for the new engine
+
+It does not reset:
+
+- The iOS process
+- Swift, Objective-C, C, or C++ static/global state
+- Native singleton state
+- Native resources retained by plugins
+- Unrelated Flutter engines or background isolates
+- Native app launch lifecycle callbacks from a real process launch
+
+For code-push systems and plugins with heavy native state, verify behavior in a real release build. Same-process engine restart is not equivalent to full process restart.
+
+## Notification fallback
+
+Use the notification fallback only when the tradeoff is acceptable:
+
+```dart
+Restart.restartApp(
+  mode: RestartMode.notificationFallback,
+  notificationTitle: 'Update applied',
+  notificationBody: 'Tap to reopen the app.',
+);
+```
+
+The plugin requests notification permission at the moment of restart. If not already granted, iOS shows the system prompt right before exit, which feels abrupt.
+
+Request permission earlier in your app lifecycle. The `permission_handler` package works well for this.
+
+If notification permission has been denied, `restartApp()` returns a failed result.
+
+## Provisioning profiles
+
+`restart_app` uses local notifications only, not push notifications. It adds no push-related entitlements to your app.
+
+If you see `"requires a provisioning profile with the Push Notifications feature"` when exporting an IPA, another dependency is the cause, commonly `firebase_messaging`. Add the Push Notifications capability to your distribution provisioning profile.

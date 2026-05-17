@@ -1,0 +1,67 @@
+---
+title: Quickstart
+description: Add restart_app to a Flutter project and restart the app from Dart.
+---
+
+## Install
+
+Add the package:
+
+```yaml
+dependencies:
+  restart_app: ^1.8.3
+```
+
+Then fetch dependencies:
+
+```bash
+flutter pub get
+```
+
+## Restart the app
+
+Import the package and call `Restart.restartApp()`:
+
+```dart
+import 'package:restart_app/restart_app.dart';
+
+await Restart.restartApp();
+```
+
+For production flows, keep the returned result and handle failures:
+
+```dart
+final result = await Restart.restartApp();
+
+if (!result.success) {
+  // Show or log result.code and result.message.
+}
+```
+
+`Restart.restartApp()` returns a `RestartResult` with `success`, the resolved `mode`, and platform error details when the restart cannot be started.
+
+## Customize behavior
+
+Default behavior works for normal app restart flows. Pass options only when your app needs a specific platform behavior.
+
+```dart
+await Restart.restartApp(
+  mode: RestartMode.platformDefault,
+  webOrigin: '#/home',
+  forceKill: false,
+  notificationTitle: 'Restart',
+  notificationBody: 'Tap to reopen the app.',
+);
+```
+
+## Check capabilities
+
+Use `Restart.restartCapability()` when your UI should adapt to the current platform.
+
+```dart
+final capability = await Restart.restartCapability();
+
+if (capability.flutterEngineRestart) {
+  await Restart.restartApp(mode: RestartMode.flutterEngine);
+}
+```

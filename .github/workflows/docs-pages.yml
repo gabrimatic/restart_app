@@ -1,0 +1,70 @@
+name: Docs Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'doc/**'
+      - 'README.md'
+      - '.github/workflows/docs-pages.yml'
+      - 'test/docs_site_test.dart'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'doc/**'
+      - 'README.md'
+      - '.github/workflows/docs-pages.yml'
+      - 'test/docs_site_test.dart'
+  workflow_dispatch:
+
+concurrency:
+  group: docs-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Validate and export docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test test/docs_site_test.dart
+      - run: npm install -g mint
+      - run: mint validate
+        working-directory: doc
+      - run: mint broken-links
+        working-directory: doc
+      - run: mint export --output ../docs-export.zip
+        working-directory: doc
+      - run: |
+          mkdir -p _site
+          unzip -q docs-export.zip -d _site
+          node doc/scripts/prepare-github-pages.mjs _site "/${{ github.event.repository.name }}"
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy docs
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/deploy-pages@v4
+        id: deployment

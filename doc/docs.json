@@ -1,0 +1,54 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "restart_app",
+  "description": "Flutter package documentation for restarting or relaunching apps with platform-specific native behavior.",
+  "colors": {
+    "primary": "#2563eb"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start",
+        "pages": [
+          "index",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Product",
+        "pages": [
+          "product/platform-behavior",
+          "product/ios-engine-restart",
+          "product/background-isolates"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/api",
+          "reference/configuration",
+          "reference/linux"
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Pub.dev",
+        "href": "https://pub.dev/packages/restart_app"
+      },
+      {
+        "label": "GitHub",
+        "href": "https://github.com/gabrimatic/restart_app"
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/gabrimatic/restart_app"
+    }
+  }
+}
