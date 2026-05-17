@@ -44,9 +44,10 @@ void main() {
     expect(pagesWorkflow, contains('mint export'));
     expect(pagesWorkflow, contains('actions/deploy-pages'));
 
-    expect(ciWorkflow, contains('paths-ignore:'));
-    expect(ciWorkflow, contains('doc/**'));
-    expect(ciWorkflow, contains('.github/workflows/docs-pages.yml'));
-    expect(ciWorkflow, contains('test/docs_site_test.dart'));
+    expect(ciWorkflow, contains('paths:'));
+    expect(ciWorkflow, isNot(contains('doc/**')));
+    expect(ciWorkflow, isNot(contains('README.md')));
+    expect(ciWorkflow, isNot(contains('.github/workflows/docs-pages.yml')));
+    expect(ciWorkflow, contains('!test/docs_site_test.dart'));
   });
 }

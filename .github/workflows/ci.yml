@@ -3,18 +3,37 @@ name: CI
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - 'doc/**'
-      - 'README.md'
-      - '.github/workflows/docs-pages.yml'
-      - 'test/docs_site_test.dart'
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'analysis_options.yaml'
+      - 'pubspec.yaml'
+      - 'lib/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'linux/**'
+      - 'macos/**'
+      - 'windows/**'
+      - 'example/**'
+      - 'test/**'
+      - '!test/docs_site_test.dart'
+      - 'test_apps/**'
   pull_request:
     branches: [master]
-    paths-ignore:
-      - 'doc/**'
-      - 'README.md'
-      - '.github/workflows/docs-pages.yml'
-      - 'test/docs_site_test.dart'
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'analysis_options.yaml'
+      - 'pubspec.yaml'
+      - 'lib/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'linux/**'
+      - 'macos/**'
+      - 'windows/**'
+      - 'example/**'
+      - 'test/**'
+      - '!test/docs_site_test.dart'
+      - 'test_apps/**'
+  workflow_dispatch:
 
 jobs:
   analyze:
