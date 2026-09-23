@@ -92,11 +92,14 @@ Windows and Linux must preserve an argument containing
 spaces, quotes, and Unicode. Linux also checks preflight failure and an accepted
 restart whose `execv` fails with an invalid executable, then restores the test
 binary and requires a successful retry. The runner restores its own backup if
-the test is interrupted. macOS and Windows must change PID; Linux `execv`
-retains PID. Before cleanup, only the final process may still run the disposable
+the test is interrupted. Each macOS and Windows restart must change PID;
+an older PID can be reused after its process exits. Linux `execv` retains PID.
+Before cleanup, only the final process may still run the disposable
 executable. Cleanup stops only PIDs recorded by the current run after checking
 executable identity; unrecorded matching processes cause failure and are left
-alone. The report is written after confirming no owned process remains.
+alone. Raw boot records are preserved even if validation fails. A passing
+report requires all restart checks and confirmation that no owned process
+remains after cleanup.
 
 The separate Windows native harness injects launch, event, worker, wait, and
 resume failures, checks resource cleanup, and confirms later requests recover:

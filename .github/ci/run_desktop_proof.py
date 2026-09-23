@@ -152,7 +152,10 @@ def validate_proof(*, run_id: str, cycles: int, platform: str, state: dict,
     require(len(pid_values) == cycles + 1 and all(value.isdecimal() and int(value) > 0 for value in pid_values),
             'Missing valid boot PIDs.')
     pids = [int(value) for value in pid_values]
-    require(len(set(pids)) == (1 if platform == 'linux' else cycles + 1),
+    # Numeric PIDs may be reused after an earlier process exits. Each new
+    # Windows/macOS child must differ from its still-live immediate parent.
+    require(len(set(pids)) == 1 if platform == 'linux' else
+            all(previous != current for previous, current in zip(pids, pids[1:])),
             'Unexpected process identity across native restarts.')
     expected_state = dict(runId=run_id, requestedCycles=cycles, complete=True,
                           cycle=cycles + 1, persistedLaunches=cycles + 1,
@@ -175,6 +178,28 @@ def validate_proof(*, run_id: str, cycles: int, platform: str, state: dict,
                 summary=summary, results=result, state=state, native_log=native_log)
 
 
+def record_observation(output: Path, observation: dict, directories: list[Path],
+                       log_file: Path) -> None:
+    """Retain raw diagnostics without treating the app's summary as proof."""
+    def capture(path, target, key):
+        try:
+            target[key] = path.read_text(encoding='utf-8', errors='replace')
+        except FileNotFoundError:
+            # Keep a previously captured value if cleanup removed a file.
+            pass
+        except OSError as error:
+            observation.setdefault('read_errors', {})[str(path)] = str(error)
+
+    for directory in directories:
+        raw = observation['raw_files'].setdefault(str(directory), {})
+        for name in ['state.json', 'run_id.txt', 'restart_proof.txt',
+                     'restart_result.txt', 'restart_failure.txt']:
+            capture(directory / name, raw, name)
+    capture(log_file, observation, 'native_log')
+    observation['status'] = 'failed' if observation['errors'] else 'not_yet_validated'
+    output.write_text(json.dumps(observation, indent=2) + '\n')
+
+
 def cycle_count(value: str) -> int:
     count = int(value)
     if count < 1 or count > 1000:
@@ -188,6 +213,13 @@ def main() -> None:
     parser.add_argument('--output', type=Path, default=Path('desktop-proof.json'))
     parser.add_argument('--cycles', type=cycle_count, default=30)
     args = parser.parse_args()
+    run_id = uuid.uuid4().hex
+    observation = dict(status='not_yet_validated', run_id=run_id,
+                       platform=sys.platform, requested_cycles=args.cycles,
+                       validation_status='not_started', cleanup_status='not_started',
+                       raw_files={}, errors=[])
+    # Replace stale passing output before setup or launch can fail.
+    args.output.write_text(json.dumps(observation, indent=2) + '\n')
     executable = args.executable.resolve()
     directories = [Path.home() / 'restart_app_ci_proof']
     if executable.suffix == '.app':
@@ -203,7 +235,6 @@ def main() -> None:
         for name in ['state.json', 'run_id.txt', 'restart_proof.txt',
                      'restart_result.txt', 'restart_failure.txt']:
             (directory / name).unlink(missing_ok=True)
-    run_id = uuid.uuid4().hex
     environment = dict(os.environ, RESTART_APP_PROOF_RUN_ID=run_id,
                        RESTART_APP_PROOF_CYCLES=str(args.cycles))
     command = [str(executable)]
@@ -212,10 +243,14 @@ def main() -> None:
     original_mode = executable.stat().st_mode
     log_file = args.output.with_suffix('.log')
     log_stream = log_file.open('w', encoding='utf-8')
-    process = subprocess.Popen(command, env=environment, stdout=log_stream,
-                               stderr=subprocess.STDOUT)
+    process = None
     evidence = None
+    phase = 'launch'
     try:
+        record_observation(args.output, observation, directories, log_file)
+        process = subprocess.Popen(command, env=environment, stdout=log_stream,
+                                   stderr=subprocess.STDOUT)
+        phase = 'execution'
         timeout = 30 + args.cycles * 10
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline and evidence is None:
@@ -226,6 +261,9 @@ def main() -> None:
                 proof = directory / 'restart_proof.txt'
                 if not proof.exists():
                     continue
+                phase = 'validation'
+                observation['validation_status'] = 'pending'
+                record_observation(args.output, observation, directories, log_file)
                 state = json.loads((directory / 'state.json').read_text())
                 result = (directory / 'restart_result.txt').read_text()
                 summary = proof.read_text()
@@ -234,6 +272,8 @@ def main() -> None:
                                           platform=sys.platform, state=state,
                                           result=result, summary=summary,
                                           native_log=native_log)
+                observation['validation_status'] = 'passed'
+                phase = 'process_check'
                 evidence['live_processes_before_cleanup'] = wait_for_only_final_process(
                     executable, int(state['lastPid']))
                 evidence['obsolete_processes_remaining'] = []
@@ -242,31 +282,40 @@ def main() -> None:
                 time.sleep(0.5)
         if evidence is None:
             raise TimeoutError(f'The application did not produce restart proof within {timeout} seconds.')
+    except BaseException as error:
+        if phase == 'validation':
+            observation['validation_status'] = 'failed'
+        observation['errors'].append(dict(phase=phase, type=type(error).__name__,
+                                         message=str(error)))
+        record_observation(args.output, observation, directories, log_file)
+        raise
     finally:
-        if sys.platform == 'linux':
-            # Recover the disposable executable even when its failure probe
-            # crashes before its own finally block restores the execute bits.
-            backup = executable.with_name(
-                f'{executable.name}.restart-proof-backup-{run_id}')
-            if backup.exists():
-                backup.replace(executable)
-            executable.chmod(original_mode)
-        # Terminate only processes recorded by this run of the disposable app.
-        pids = {process.pid} if process.poll() is None else set()
-        for directory in directories:
-            try:
-                current = json.loads((directory / 'state.json').read_text())
-                if current['runId'] == run_id and current.get('lastPid'):
-                    pids.add(int(current['lastPid']))
-                    results = (directory / 'restart_result.txt').read_text()
-                    pids.update(int(value) for value in
-                                re.findall(r'^pid=(\d+)$', results, re.MULTILINE))
-            except (OSError, ValueError, KeyError):
-                pass
-        for pid in pids:
-            proof_process(pid, executable, terminate=True)
+        observation['cleanup_status'] = 'pending'
         try:
-            process.wait(timeout=10)
+            if sys.platform == 'linux':
+                # Recover the disposable executable even when its failure probe
+                # crashes before its own finally block restores the execute bits.
+                backup = executable.with_name(
+                    f'{executable.name}.restart-proof-backup-{run_id}')
+                if backup.exists():
+                    backup.replace(executable)
+                executable.chmod(original_mode)
+            # Terminate only processes recorded by this run of the disposable app.
+            pids = {process.pid} if process is not None and process.poll() is None else set()
+            for directory in directories:
+                try:
+                    current = json.loads((directory / 'state.json').read_text())
+                    if current['runId'] == run_id and current.get('lastPid'):
+                        pids.add(int(current['lastPid']))
+                        results = (directory / 'restart_result.txt').read_text()
+                        pids.update(int(value) for value in
+                                    re.findall(r'^pid=(\d+)$', results, re.MULTILINE))
+                except (OSError, ValueError, KeyError):
+                    pass
+            for pid in pids:
+                proof_process(pid, executable, terminate=True)
+            if process is not None:
+                process.wait(timeout=10)
             deadline = time.monotonic() + 5
             remaining = {pid for pid in pids if proof_process(pid, executable)}
             while remaining and time.monotonic() < deadline:
@@ -274,8 +323,19 @@ def main() -> None:
                 remaining = {pid for pid in pids if proof_process(pid, executable)}
             if remaining:
                 raise RuntimeError(f'Owned proof processes survived cleanup: {sorted(remaining)}')
+            observation['cleanup_status'] = 'passed'
+        except BaseException as error:
+            observation['cleanup_status'] = 'failed'
+            observation['errors'].append(dict(phase='cleanup', type=type(error).__name__,
+                                             message=str(error)))
+            raise
         finally:
             log_stream.close()
+            record_observation(args.output, observation, directories, log_file)
+    evidence['status'] = 'passed'
+    evidence['validation_status'] = observation['validation_status']
+    evidence['cleanup_status'] = observation['cleanup_status']
+    evidence['raw_files'] = observation['raw_files']
     evidence['owned_processes_after_cleanup'] = []
     args.output.write_text(json.dumps(evidence, indent=2) + '\n')
     print(json.dumps(evidence, indent=2), flush=True)
