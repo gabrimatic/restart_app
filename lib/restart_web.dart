@@ -28,7 +28,8 @@ class RestartWeb {
           'notificationFallback': false,
           'engineRestartConfigured': false,
           'platformDefaultMode': 'platformDefault',
-          'reason': 'Web restart reloads the current page.',
+          'reason':
+              'Web restart reloads the Flutter app at the same browser URL.',
         };
       case 'restartApp':
         final args = call.arguments as Map?;
@@ -57,11 +58,11 @@ class RestartWeb {
     }
   }
 
-  /// Reloads or replaces the current browser location.
+  /// Restarts the Flutter web app at the existing URL or a chosen destination.
   ///
-  /// The `webOrigin` parameter is optional and defaults to null, which reloads
-  /// the current page and preserves the current route. Pass a hash path such
-  /// as `#/home` to move to that hash route and reload, or a full URL to
+  /// A null `webOrigin` reloads the whole app at the same URL, including its
+  /// path, query, and hash. The app's router chooses the screen. Pass a hash path
+  /// such as `#/home` to move to that hash route and reload, or a full URL to
   /// replace the current location entirely. A destination that differs only
   /// by its fragment still reloads the document. Relative URLs resolve against
   /// the document's base URL, including any HTML `base` element.

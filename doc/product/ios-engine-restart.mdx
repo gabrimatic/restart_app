@@ -1,26 +1,19 @@
 ---
 title: iOS engine restart
-description: Configure the supported same-process Flutter engine restart path on iOS.
+description: Restart Dart and the Flutter UI without closing the iOS app.
 ---
 
-iOS does not provide a public API for an app to terminate itself and automatically launch a fresh process of the same app. Android-style full process restart is not available on iOS with public APIs.
+On iOS, `restart_app` creates a new Flutter engine and replaces the Flutter view. The app stays open in the same native process.
 
-`restart_app` supports two iOS behaviors:
+Configure plugin registration in `ios/Runner/AppDelegate.swift` before calling `Restart.restartApp()`. Without this setup, the call returns `IOS_ENGINE_RESTART_NOT_CONFIGURED` and leaves the app running.
 
-1. Flutter engine restart, recommended.
-2. Notification fallback, legacy and explicit only.
+## Host setup
 
-## Configure the host app
+Merge the example that matches your app into its existing delegate. Keep your other app initialization code.
 
-The host app owns `GeneratedPluginRegistrant`, so iOS engine restart requires one app-side setup step.
+### UIScene apps
 
-Choose the setup that matches your iOS lifecycle.
-
-### Flutter 3.41+ UIScene apps
-
-Use this setup when your app has migrated to Flutter's UIScene lifecycle and your delegate already looks like `@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate`.
-
-Keep the normal plugin registration for the implicit app engine in `didInitializeImplicitFlutterEngine`. Add `RestartAppPlugin.configureEngineRestart` in `application(_:didFinishLaunchingWithOptions:)` so `restart_app` can register plugins on each newly created engine:
+Use this example if your app uses Flutter's UIScene lifecycle, which is the default for new apps since Flutter 3.41. Keep the initial engine's plugin registration in `didInitializeImplicitFlutterEngine`; the `configureEngineRestart` callback registers plugins for each replacement engine.
 
 ```swift
 import UIKit
@@ -51,19 +44,11 @@ import restart_app
 }
 ```
 
-This follows Flutter's UIScene migration model: the initial engine is registered through `didInitializeImplicitFlutterEngine`, and restarted engines are registered through the `restart_app` callback above.
-
-`restart_app` selects a visible window from a foreground-active `UIWindowScene` and replaces its root `FlutterViewController`, preferring the key window. It rejects automatic selection when no active scene is available. Request restarts while the app is active. If your app has multiple scenes or a custom native shell, pass a `windowProvider` or `viewControllerInstaller` to `configureEngineRestart` so the plugin targets the correct window. A custom `windowProvider` returning `nil` fails with `IOS_NO_ACTIVE_WINDOW`; it does not fall back to another scene. Reconfiguring without a custom installer restores the default root replacement and safety checks.
-
-Complete Flutter's [UIScene migration](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate), including `UIApplicationSceneManifest` in `Info.plist`. Xcode 27 requires the scene lifecycle; the restart callback alone does not migrate the app.
-
-If you implement your own `SceneDelegate`, keep Flutter's scene lifecycle wiring there too: subclass `FlutterSceneDelegate` or conform to `FlutterSceneLifeCycleProvider`, as described in Flutter's [UISceneDelegate migration guide](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate).
+An existing app must also have Flutter's UIScene configuration in `Info.plist`. Follow the [Flutter UIScene migration guide](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate) if you are upgrading an older host. If you have a custom `SceneDelegate`, preserve Flutter's scene callbacks by extending `FlutterSceneDelegate` or implementing `FlutterSceneLifeCycleProvider`.
 
 ### Classic AppDelegate apps
 
-Use this setup only when your app still registers plugins from `application(_:didFinishLaunchingWithOptions:)`. This legacy lifecycle is for older toolchains. Apps built with Xcode 27 must migrate to UIScene before they can launch.
-
-In `ios/Runner/AppDelegate.swift`:
+For an older host that registers plugins in `didFinishLaunchingWithOptions`, keep that registration and add the restart callback:
 
 ```swift
 import UIKit
@@ -90,63 +75,60 @@ import restart_app
 }
 ```
 
-Then call:
+This layout is for the older app lifecycle. Apps built with the iOS 27 SDK must migrate to UIScene.
+
+Rebuild the iOS app after changing Swift code. Hot reload does not apply these changes.
+
+## Restart from Dart
+
+After setup, the default call uses engine restart on iOS. Call it from an async UI action while the app is active. If you have unsaved data, save it and await the write before this call:
 
 ```dart
+import 'package:restart_app/restart_app.dart';
+
 final result = await Restart.restartApp();
 ```
 
-`RestartMode.platformDefault` uses Flutter engine restart on iOS when this setup is present. If this setup is missing, `platformDefault` fails cleanly on iOS instead of falling back to notification plus `exit(0)`.
+You can also select `RestartMode.flutterEngine` explicitly. Both calls use the same iOS behavior. A successful [result](/reference/api/#restartresult) means the request was accepted; the old Dart isolate stops as the engine is replaced.
 
-To request the engine path explicitly:
+## State after restart
 
-```dart
-final result = await Restart.restartApp(
-  mode: RestartMode.flutterEngine,
-);
-```
+The new engine starts a new Dart root isolate and widget tree, with fresh plugin and platform-view registrations. Data already saved to files, databases, or preferences remains available.
 
-## What gets reset
+The native process stays alive. Swift and Objective-C globals, native singletons, resources retained outside the engine, and unrelated engines or isolates are not reset. Native app launch callbacks do not run again. If your app depends on resetting one of these resources, handle it in the host or plugin that owns it.
 
-Engine restart resets:
+## Custom windows and native containers
 
-- Dart root isolate
-- Flutter widget tree
-- Flutter engine-owned platform channels
-- Flutter plugin registrations for the new engine
-- Platform-view factory registrations for the new engine
+For a standard Flutter app, the plugin selects a visible window in a foreground-active `UIWindowScene`, preferring its key window, and replaces the root `FlutterViewController`.
 
-It does not reset:
+If your host owns several windows, pass a `windowProvider` to `configureEngineRestart` to select the intended window. Returning `nil` rejects the request with `IOS_NO_ACTIVE_WINDOW` instead of selecting another window.
 
-- The iOS process
-- Swift, Objective-C, C, or C++ static/global state
-- Native singleton state
-- Native resources retained by plugins
-- Unrelated Flutter engines or background isolates
-- Native app launch lifecycle callbacks from a real process launch
+If Flutter is embedded inside a native container, also provide a `viewControllerInstaller` that installs the replacement controller in that container. Without an installer, the plugin rejects a non-Flutter root controller with `IOS_UNSAFE_ROOT_REPLACEMENT`.
 
-For code-push systems and plugins with heavy native state, verify behavior in a real release build. Same-process engine restart is not equivalent to full process restart.
+For a custom Dart entrypoint, initial route, or engine configuration, use `RestartAppPlugin.setEngineFactory`. Return a new, running engine with its plugins registered. Do not return the old engine or an engine that failed to start.
+
+Use `beforeRestart` to release host-owned resources before the new engine is created. Use `afterRestart` to connect custom channels to the new engine after its controller is installed, before the plugin destroys the old engine's context.
 
 ## Notification fallback
 
-Use the notification fallback only when the tradeoff is acceptable:
+`RestartMode.notificationFallback` schedules a local notification and closes the app. The user must tap the notification to reopen it. The default mode never chooses this behavior automatically.
+
+From an async UI action, after any required writes have finished:
 
 ```dart
-Restart.restartApp(
+import 'package:flutter/foundation.dart';
+import 'package:restart_app/restart_app.dart';
+
+final result = await Restart.restartApp(
   mode: RestartMode.notificationFallback,
   notificationTitle: 'Update applied',
   notificationBody: 'Tap to reopen the app.',
 );
+if (!result.success) {
+  debugPrint(result.message ?? 'The app could not schedule a restart.');
+}
 ```
 
-The plugin requests notification permission at the moment of restart. If not already granted, iOS shows the system prompt right before exit, which feels abrupt.
+The plugin asks for notification permission if the user has not decided yet. If permission is denied or the notification cannot be scheduled, the result reports failure and the app stays open. Explain that the app will close and require a tap before offering this action.
 
-Request permission earlier in your app lifecycle. The `permission_handler` package works well for this.
-
-If notification permission has been denied, `restartApp()` returns a failed result.
-
-## Provisioning profiles
-
-`restart_app` uses local notifications only, not push notifications. It adds no push-related entitlements to your app.
-
-If you see `"requires a provisioning profile with the Push Notifications feature"` when exporting an IPA, another dependency is the cause, commonly `firebase_messaging`. Add the Push Notifications capability to your distribution provisioning profile.
+Local notifications do not require the Push Notifications capability.

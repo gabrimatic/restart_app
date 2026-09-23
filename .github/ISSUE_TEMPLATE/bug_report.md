@@ -4,9 +4,10 @@ about: Report a bug or unexpected behavior
 labels: bug
 ---
 
-## Description
+## Problem
 
-A clear description of what the bug is.
+Describe what happened and what you expected. For security concerns, use the
+[private reporting instructions](https://github.com/gabrimatic/restart_app/blob/master/SECURITY.md).
 
 ## Platform
 
@@ -17,23 +18,20 @@ A clear description of what the bug is.
 - [ ] Web
 - [ ] Windows
 
-## Reproduction Steps
+## Reproduction
 
-1.
-2.
-3.
+Include a minimal example and the steps to reproduce the problem. Show the
+`Restart.restartApp()` call, including its mode and options.
 
-## Expected Behavior
+## Result
 
-What you expected to happen.
-
-## Actual Behavior
-
-What actually happened. Include the full error message or stack trace if applicable.
+Include the returned result, error message, and relevant logs. Remove credentials
+and personal data before posting.
 
 ## Environment
 
 - `restart_app` version:
 - Flutter version (`flutter --version`):
-- Dart version:
 - Target platform and OS version:
+- Build mode (debug, profile, or release):
+- Browser or app packaging, if relevant:

@@ -1,11 +1,13 @@
 ---
 title: API reference
-description: Dart API surface for restart_app.
+description: Restart methods, modes, capabilities, and results.
 ---
+
+Import `package:restart_app/restart_app.dart` to use these types.
 
 ## Restart.restartApp
 
-Restarts the Flutter application and returns a structured result.
+Requests a restart or web reload and returns a `Future<RestartResult>`.
 
 ```dart
 static Future<RestartResult> restartApp({
@@ -17,77 +19,82 @@ static Future<RestartResult> restartApp({
 })
 ```
 
-By default, this uses the best supported behavior for the current platform. Pass `mode` when you want a specific restart path, such as `RestartMode.process`, `RestartMode.flutterEngine`, or `RestartMode.notificationFallback`.
+The default behavior depends on the [platform](/product/platform-behavior/). Pass `mode` to request another supported behavior. See [configuration](/reference/configuration/) for parameter defaults and examples.
+
+If your app has unsaved data, finish and await those writes before calling. The request can stop the Dart isolate or unload the browser document before later code finishes.
 
 ### Web destinations
 
-`webOrigin` controls the web destination:
+On web, only `RestartMode.platformDefault` is supported. `webOrigin` determines the destination:
 
-- Null or empty reloads the current URL and preserves its route.
-- A hash-only value such as `#/home` updates the fragment and reloads. Changing the fragment adds a history entry.
-- A full or relative URL targeting the same document replaces the current history entry and reloads, including when only the fragment changes.
-- A different document uses `window.location.replace`, so navigation replaces the current history entry.
+| Value | Behavior |
+| --- | --- |
+| `null` or `''` | Reload the Flutter app's browser URL, preserving its path, query, and fragment. |
+| Hash only, such as `#/home` | Set the fragment and reload. A changed fragment adds a browser history entry. |
+| Full or relative URL for the same document | Replace the history entry and reload, even if the URL is identical or only its fragment differs. |
+| Full or relative URL for a different document | Navigate with `window.location.replace`, replacing the history entry. |
 
-Relative URLs resolve against `document.baseURI`, including any HTML `base` element. Persist required state before calling; code after the request may not finish before the document unloads.
+Relative URLs resolve against `document.baseURI`, including an HTML `<base href>` element. URLs match the same document when they are equal after removing their fragments. The default reload does not change the URL to your app's initial route.
+
+An app embedded in an iframe reloads its own frame.
 
 ## Restart.restartCapability
 
-Returns the restart behavior available on the current platform.
+Returns a `Future<RestartCapability>` describing which restart behaviors the platform provides.
 
 ```dart
 static Future<RestartCapability> restartCapability()
 ```
 
-Use this when your app should adapt UI or behavior to the current platform.
-Capability flags describe the implementation, not whether the next restart will
-succeed. On web, default reload is supported even though all three restart flags
-are false. Missing registration, platform errors, and malformed capability
-responses return unavailable capabilities rather than throwing a channel error.
+Use it to decide which restart options to show. These capabilities do not guarantee that a request will succeed: for example, an iOS engine restart also needs the app to be active and have a suitable window.
+
+Web supports the default reload even though its process, engine, and notification flags are all `false`. Missing plugin registration and platform-channel errors return unavailable capabilities. The `reason` field explains the failure when an explanation is available.
 
 ## RestartMode
 
-| Value | Description |
+| Value | Behavior |
 | --- | --- |
-| `platformDefault` | Uses the best behavior available for the current platform. |
-| `flutterEngine` | Recreates the Flutter engine in the same native process where supported. |
-| `process` | Requests a native process relaunch where the platform supports it. |
-| `notificationFallback` | iOS-only legacy fallback that schedules a local notification, exits, and requires the user to tap the notification to reopen the app. |
+| `platformDefault` | Use the platform's [default restart or reload](/product/platform-behavior/). |
+| `flutterEngine` | Recreate the Flutter engine in the existing process. Supported on configured iOS hosts. |
+| `process` | Relaunch on Android, macOS, and Windows, or replace the running process image on Linux. Unsupported on iOS and web. |
+| `notificationFallback` | Schedule an iOS local notification and close the app. The user must tap the notification to reopen it. |
 
 ## RestartResult
 
-| Field | Description |
+| Field | Meaning |
 | --- | --- |
-| `success` | Whether the platform accepted and initiated the requested restart. |
-| `mode` | The mode that was accepted by the platform. |
-| `code` | Platform-specific error code when `success` is false. |
-| `message` | Platform-specific error message when `success` is false. |
+| `success` | `true` when the platform accepts the request. It does not confirm that the replacement app or engine has finished starting. |
+| `mode` | The resolved mode on success; the requested mode on failure. |
+| `code` | An error identifier when the request fails, otherwise `null`. |
+| `message` | An error description when available, otherwise `null`. |
+
+Native platforms may perform the restart after sending a successful result. A failure during that later work is written to native logs and cannot change the result already returned to Dart.
 
 ## RestartCapability
 
-| Field | Description |
+| Field | Meaning |
 | --- | --- |
-| `fullProcessRestart` | Whether this platform can relaunch the app in a fresh native process. |
-| `flutterEngineRestart` | Whether this platform can recreate Flutter in the current native process. |
-| `notificationFallback` | Whether notification fallback is available on the current platform. |
-| `engineRestartConfigured` | Whether Flutter engine restart has been configured by the host app. |
-| `platformDefaultMode` | The behavior used by `RestartMode.platformDefault`. |
-| `reason` | Optional explanation when a capability is unavailable or limited. |
+| `fullProcessRestart` | Whether the platform supports a process restart. Linux replaces the process image with `execv` and keeps its PID. |
+| `flutterEngineRestart` | Whether engine restart is available in the existing native process. |
+| `notificationFallback` | Whether the iOS notification fallback is available. This does not report notification permission. |
+| `engineRestartConfigured` | Whether the host has configured engine restart. |
+| `platformDefaultMode` | The mode selected for `RestartMode.platformDefault`. |
+| `reason` | An optional explanation of an unavailable or limited capability. |
 
-## Results and failures
+## Failures
 
-`success: true` acknowledges acceptance, not a completed relaunch. The old Dart
-isolate may stop before subsequent work finishes. Persist and await required
-state before calling restart, and verify a fresh boot when testing your app.
+Platform errors are returned as `RestartResult` values with `success: false`. Read `code` and `message` to decide how your app should respond.
 
-Platform errors become failed `RestartResult` values. Missing plugin registration
-returns `MISSING_PLUGIN`; an unexpected response returns `UNKNOWN_RESULT`.
-Initialize the Flutter binding before invoking platform channels before `runApp`.
-Prevent duplicate requests while a restart is pending.
-Native Android and desktop implementations reject overlapping requests with
-`RESTART_ALREADY_IN_PROGRESS`. iOS uses `IOS_RESTART_ALREADY_IN_PROGRESS` for
-both engine restart and notification fallback. Retry only after a failure has
-been handled or a later intentional user action.
+| Code | Meaning |
+| --- | --- |
+| `MISSING_PLUGIN` | The native plugin is not registered. Rebuild the app after adding the package. |
+| `UNKNOWN_RESULT` | The native plugin returned an unrecognized response. |
+| `UNSUPPORTED_RESTART_MODE` | The requested mode is not supported on this platform. |
+| `IOS_ENGINE_RESTART_NOT_CONFIGURED` | The iOS host needs [plugin registration for replacement engines](/product/ios-engine-restart/#host-setup). |
+| `IOS_PROCESS_RESTART_UNSUPPORTED` | iOS cannot automatically relaunch the app in a new process. Use engine restart or offer the explicit notification fallback. |
+| `RESTART_ALREADY_IN_PROGRESS` | Android or a desktop platform is already handling an earlier restart request. |
+| `IOS_RESTART_ALREADY_IN_PROGRESS` | iOS is already handling an engine restart or notification fallback. |
 
-On failure, `mode` preserves the requested mode. On success, it reports the
-resolved mode returned by the native implementation. Legacy native responses
-that only return `ok` retain the requested mode.
+Send one restart request per user action. Disable repeated taps as soon as the action starts. If the request fails, show the failure and let the user try again after addressing its cause.
+
+Call from the main isolate. If you invoke the API before `runApp`, first call `WidgetsFlutterBinding.ensureInitialized()`. See [background isolates](/product/background-isolates/) for worker coordination.

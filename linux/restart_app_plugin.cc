@@ -174,7 +174,7 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
     }
 
     // Validate that the executable is resolvable and accessible before
-    // responding with success. Once "ok" is sent, failures are silent.
+    // responding with success. Later failures can only be logged natively.
     char exe_path[PATH_MAX];
     if (!resolve_exe_path(exe_path, sizeof(exe_path))) {
       g_atomic_int_set(&g_restart_pending, 0);

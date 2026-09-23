@@ -3,9 +3,15 @@ title: Linux
 description: Preserve command-line arguments across Linux process replacement.
 ---
 
-On Linux, `restart_app` replaces the current process through `execv`.
+On Linux, a restart uses `execv` to replace the current process image with the
+app executable. Dart starts again, but the process ID stays the same.
 
-By default, the restarted process launches without the original command-line arguments. To preserve them, add the header and call below to your existing `linux/runner/main.cc` (`linux/main.cc` in older Flutter projects). Keep the rest of `main()` unchanged:
+## Preserve command-line arguments
+
+The restarted app receives no original command-line arguments unless the
+runner registers them. If your app needs those arguments, add the header and
+call below to `linux/runner/main.cc`, or `linux/main.cc` in older Flutter
+projects. Keep the rest of `main()` unchanged:
 
 ```cpp
 #include <restart_app/restart_app_plugin.h>
@@ -16,10 +22,18 @@ int main(int argc, char** argv) {
 }
 ```
 
-Flutter's generated plugin rules link the runner to `restart_app_plugin`. If your runner has custom plugin wiring, ensure that link exists in `linux/CMakeLists.txt`, after `include(flutter/generated_plugins.cmake)`:
+Flutter's generated plugin rules link the runner to `restart_app_plugin`. If
+you use custom plugin wiring, add that link in `linux/CMakeLists.txt` after
+`include(flutter/generated_plugins.cmake)`:
 
 ```cmake
 target_link_libraries(${BINARY_NAME} PRIVATE restart_app_plugin)
 ```
 
-Most Flutter apps do not rely on command-line arguments, so this step is optional.
+This setup is optional for apps that do not use command-line arguments.
+
+## Failed restarts
+
+A successful response confirms that the request was accepted. If `execv`
+fails afterward, the plugin logs a warning and leaves the current app running.
+Resolve the launch failure before retrying.

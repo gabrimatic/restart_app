@@ -1,61 +1,51 @@
 ---
 title: Background isolates
-description: Route restart requests through the main isolate.
+description: Finish worker tasks and save their results before restarting on the main isolate.
 ---
 
-Route restart requests through the main isolate, where the app can save state and coordinate its lifecycle.
+Call `Restart.restartApp()` from the main isolate, where your app can finish saving data and coordinate the UI. A worker should return its result or send a restart request to the main isolate.
 
-`Restart.restartApp()` uses a platform channel. Calling it from a background isolate whose binary messenger has not been initialized throws:
+## One-off work
 
-```text
-Bad state: The BackgroundIsolateBinaryMessenger.instance value is invalid
-until BackgroundIsolateBinaryMessenger.ensureInitialized is executed.
-```
+For a finite task on a native platform, use `Isolate.run`. This example decodes configuration JSON in a worker, awaits your storage write on the main isolate, and then requests a restart. If decoding or saving fails, it reports the error and does not restart.
 
-Initializing a background messenger makes platform channels available, but does not coordinate a restart with the UI or pending writes. Send a message to the main isolate.
-
-Call this function from an async app action while the app is active. Supply your persistence function and an error callback. A save failure prevents the restart; worker errors, early exit, and a one-minute timeout also report a failure. Close the port and stop the worker when the operation ends:
+Call `applyConfigurationAndRestart` from your app's UI. Supply the JSON, a function that saves the decoded configuration, and a callback that displays failures:
 
 ```dart
+import 'dart:convert';
 import 'dart:isolate';
 
 import 'package:restart_app/restart_app.dart';
 
-Future<void> runWorkerAndRestart({
-  required Future<void> Function() savePendingChanges,
+Future<void> applyConfigurationAndRestart({
+  required String configurationJson,
+  required Future<void> Function(Map<String, dynamic>) saveConfiguration,
   required void Function(String message) reportFailure,
 }) async {
-  final requests = ReceivePort();
-  Isolate? worker;
   try {
-    worker = await Isolate.spawn(
-      workerMain,
-      requests.sendPort,
-      onError: requests.sendPort,
-      onExit: requests.sendPort,
-    );
-    final message = await requests.first.timeout(const Duration(minutes: 1));
-    if (message != 'restart') {
-      throw StateError('Worker stopped without a restart request: $message');
-    }
+    final configuration = await _decodeConfiguration(configurationJson);
+    await saveConfiguration(configuration);
 
-    await savePendingChanges();
     final result = await Restart.restartApp();
     if (!result.success) {
-      reportFailure(result.message ?? result.code ?? 'Restart could not start.');
+      reportFailure(result.message ?? result.code ?? 'Restart was not accepted.');
     }
   } catch (error) {
-    reportFailure('Restart flow failed: $error');
-  } finally {
-    requests.close();
-    worker?.kill(priority: Isolate.immediate);
+    reportFailure('Could not apply the configuration: $error');
   }
 }
 
-void workerMain(SendPort mainPort) {
-  // Finish this worker's work before sending the request.
-  mainPort.send('restart');
+Future<Map<String, dynamic>> _decodeConfiguration(String source) {
+  return Isolate.run(() => jsonDecode(source) as Map<String, dynamic>);
 }
 ```
 
-If the error callback updates a widget, check that it is still mounted. Keep the restart action disabled until this function completes.
+The separate `_decodeConfiguration` function passes only the JSON string to the worker, so it does not capture a widget or either UI callback. `Isolate.run` closes its communication ports and ends the worker when the computation finishes. Keep platform-plugin calls, including `Restart.restartApp()`, on the main isolate in this example.
+
+The save callback must complete only after the write finishes. If the failure callback updates a widget, check that the widget is still mounted. On iOS, request the restart while the app is active and [engine restart is configured](/product/ios-engine-restart/).
+
+## Existing workers
+
+For a long-lived worker, send a message through a `SendPort` to a `ReceivePort` owned by the main isolate. Its listener can await any remaining writes and call `Restart.restartApp()`. Close the port when its owner is disposed.
+
+Initializing `BackgroundIsolateBinaryMessenger` enables platform-channel access in a worker, but does not coordinate the restart with the UI or other writes. Keep the restart decision on the main isolate.

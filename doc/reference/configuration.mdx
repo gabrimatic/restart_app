@@ -1,29 +1,48 @@
 ---
 title: Configuration
-description: Optional parameters for restart_app restart behavior.
+description: Choose a restart mode, web destination, or notification text.
 ---
 
-Use the default mode after completing the [setup for your platform](/quickstart/). Pass options only when your app needs a specific platform behavior.
+`Restart.restartApp()` needs no arguments for the [default behavior on each platform](/product/platform-behavior/). iOS apps must first [configure engine restart](/product/ios-engine-restart/).
+
+Pass an option only when you need to change that behavior.
+
+| Parameter | Use |
+| --- | --- |
+| `mode` | Select a [restart mode](/reference/api/#restartmode). Defaults to `platformDefault`. Unsupported modes return a failed result. |
+| `webOrigin` | Set the browser destination on web. Defaults to `null`, which reloads the Flutter app's browser URL, including its path, query, and fragment. |
+| `forceKill` | On Android, request an activity launch and then terminate the old process. Defaults to `false`; `RestartMode.process` enables it automatically. |
+| `notificationTitle` | Set the local notification title for iOS `notificationFallback`. Defaults to `'Restart'`. |
+| `notificationBody` | Set the local notification body for iOS `notificationFallback`. Defaults to `'Tap to reopen the app.'`. |
+
+Platform-specific options have no effect on other platforms.
+
+## Saved data
+
+A restart does not erase preferences, files, or databases. If your app has unsaved edits, save them through its usual storage API and await the write before calling `Restart.restartApp()`.
+
+The package does not save app state for you. Follow your storage API's commit or flush requirements for data that must survive process exit.
+
+## Web destination
+
+To reload at a particular hash route, use this call from an async app action:
 
 ```dart
-await Restart.restartApp(
-  mode: RestartMode.platformDefault,
-  webOrigin: '#/home',
-  forceKill: false,
-  notificationTitle: 'Restart',
-  notificationBody: 'Tap to reopen the app.',
-);
+await Restart.restartApp(webOrigin: '#/home');
 ```
 
-| Parameter | Platform | Description |
-| --- | --- | --- |
-| `mode` | All | Requested restart behavior: `platformDefault`, `flutterEngine`, `process`, or `notificationFallback`. |
-| `webOrigin` | Web | Null or empty reloads the current URL. Hash-only values such as `#/home` update the hash and reload. Full or relative URLs targeting the same document replace the current history entry and reload; other destinations use location replacement. |
-| `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Restart`. |
-| `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Tap to reopen the app.` |
-| `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |
+A hash-only value changes the URL fragment and reloads. Full and relative URLs replace the browser history entry; a destination in the same document also forces a reload. Relative URLs resolve against `document.baseURI`, including any `<base href>` element.
 
-Relative `webOrigin` URLs resolve against `document.baseURI`, including any
-`<base href>` element. See [web destinations](/reference/api/#web-destinations)
-for history behavior. Persist state before navigation and configure the web
-server to serve the Flutter application at the destination route.
+See [web destinations](/reference/api/#web-destinations) for the complete URL and history behavior. If you choose a different path, configure your server to serve the Flutter app there. Save and await any required data before the browser navigates.
+
+## Android process restart
+
+Use this call when you need to end the Android process as part of the restart:
+
+```dart
+await Restart.restartApp(mode: RestartMode.process);
+```
+
+The default Android behavior only relaunches the activity. It does not terminate the process unless `forceKill` is `true`.
+
+For notification permission, exit behavior, and user interaction on iOS, see [notification fallback](/product/ios-engine-restart/#notification-fallback).

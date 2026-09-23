@@ -1,5 +1,5 @@
 name: restart_app_example
-description: Demonstrates how to use the restart plugin.
+description: A Flutter example for app restarts, restart modes, and saved data.
 
 publish_to: 'none'
 

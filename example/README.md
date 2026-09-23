@@ -1,43 +1,49 @@
 # restart_app example
 
-Demonstrates how to use `restart_app`.
+Try the default restart behavior, select an explicit restart mode, and see how
+the app handles the result.
 
-The example app shows:
+## Run the app
 
-- `Restart.restartApp()` with structured success/error handling
-- path URL strategy on web
-- a UIScene iOS Flutter engine restart setup in `ios/Runner/AppDelegate.swift`
-- a small Flutter package check panel that re-runs after restart
+From this directory:
 
-## Running
-
-```bash
+```sh
 flutter pub get
 flutter run
 ```
 
-Use **Restart app** to dirty Dart-only state, restart, and confirm
-the app returns with clean Dart state while common Flutter packages still work.
+The example requires Flutter 3.38 and Dart 3.10 or later for its scene APIs and
+dependencies. The package itself supports older SDKs; see its
+[requirements](https://gabrimatic.github.io/restart_app/quickstart/#requirements). Your Flutter version also determines
+which OS versions you can run.
 
-The checks cover shared preferences, package info, connectivity, URL launcher,
-HTTP, cache/image loading, SVG rendering, file storage, SQLite, device info,
-and WebView where the current platform supports them.
+Select **Restart app** to use the platform default. The screen shows which state
+survives the restart and whether other Flutter packages remain usable. Other
+buttons let you try explicit modes and view errors for unsupported requests.
+If saving state or restarting fails, the app displays the error and lets you
+try again.
 
-The example uses Flutter's UIScene lifecycle and registers plugins on both the
-initial and replacement engines. Its `Info.plist` includes the scene manifest
-required when building with Xcode 27. The explicit **iOS notification fallback**
-button is the only path that schedules a notification and exits.
+On the web, the example uses path URLs. **Restart with explicit web URL** reloads
+the current URL through the `webOrigin` option.
 
-The example requires Dart 3.10 and Flutter 3.38 or later for the scene APIs and
-its demonstration dependencies. Current Flutter releases can impose newer OS
-minimums. The plugin itself retains its separate, lower SDK requirements.
+## iOS setup
 
-A failed state write prevents restart, displays the error, and restores the
-controls. A failed restart also restores the controls and clears the deliberate
-Dart-only test state so another attempt can be made.
+The example uses Flutter's UIScene lifecycle. Its
+[AppDelegate.swift](ios/Runner/AppDelegate.swift) registers plugins on the
+initial engine and each replacement engine. Keep the scene manifest in
+[Info.plist](ios/Runner/Info.plist) when adapting this setup. It is required when
+building with Xcode 27.
 
-See the root [README](../README.md#ios-setup) for the host setup matching your app.
+**iOS notification fallback** is a separate, explicit action. It requests
+notification permission and schedules a notification, then exits only if
+scheduling succeeds. The user must reopen the app by tapping the notification.
+The normal restart button replaces the Flutter engine within the running process.
 
-The separate `lib/web_restart_probe.dart` entrypoint verifies actual browser
-reloads and destinations. See the [runtime verification guide](https://github.com/gabrimatic/restart_app/blob/master/.github/ci/verification.md)
-for JavaScript and WebAssembly commands and the complete platform checks.
+For integration in your own app, follow the
+[iOS setup guide](https://gabrimatic.github.io/restart_app/product/ios-engine-restart/).
+
+## Contributor checks
+
+The [verification guide](https://github.com/gabrimatic/restart_app/blob/master/.github/ci/verification.md)
+describes the automated platform checks, including the separate
+`lib/web_restart_probe.dart` entrypoint for JavaScript and WebAssembly builds.

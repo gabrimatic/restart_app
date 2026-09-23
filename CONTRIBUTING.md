@@ -1,96 +1,74 @@
 # Contributing
 
-Bug fixes, platform improvements, better docs. Here's how to get involved.
+Keep changes focused and include enough detail to reproduce the problem or try
+the new behavior.
 
-## Dev Setup
+## Get started
 
-```bash
+Use a current stable Flutter SDK for repository development:
+
+```sh
 git clone https://github.com/gabrimatic/restart_app.git
 cd restart_app
 flutter pub get
-cd example && flutter pub get
-```
-
-Run the example app on your target platform:
-
-```bash
+cd example
+flutter pub get
 flutter run -d <device>
 ```
 
-## Architecture
+The example has higher SDK requirements than the package. Use the
+[compatibility checks](.github/ci/verification.md#sdk-compatibility) to test the
+package with older supported SDKs.
 
-```
-lib/
-├── restart_app.dart     # public Dart API, MethodChannel
-└── restart_web.dart     # web platform implementation
+## Find the implementation
 
-android/src/main/kotlin/gabrimatic/info/restart/
-└── RestartPlugin.kt     # Android implementation (Kotlin)
+The shared API and platform implementations use the `restart` method channel.
 
-ios/restart_app/Sources/restart_app/
-└── RestartAppPlugin.swift  # iOS implementation (Swift, FlutterEngine, UserNotifications fallback)
+| Component | Source |
+| --- | --- |
+| Public Dart API | [lib/restart_app.dart](lib/restart_app.dart) |
+| Web | [lib/restart_web.dart](lib/restart_web.dart) |
+| Android | [RestartPlugin.kt](android/src/main/kotlin/gabrimatic/info/restart/RestartPlugin.kt) |
+| iOS | [RestartAppPlugin.swift](ios/restart_app/Sources/restart_app/RestartAppPlugin.swift) |
+| Linux | [restart_app_plugin.cc](linux/restart_app_plugin.cc) |
+| macOS | [RestartAppPlugin.swift](macos/restart_app/Sources/restart_app/RestartAppPlugin.swift) |
+| Windows | [restart_app_plugin.cpp](windows/restart_app_plugin.cpp) |
 
-linux/
-└── restart_app_plugin.cc   # Linux implementation (execv)
+Read the [platform behavior guide](doc/product/platform-behavior.mdx) before
+changing a restart path. In particular, iOS engine restart depends on host
+configuration and keeps the native process alive. Notification fallback is an
+explicit opt-in that requires the user to reopen the app.
 
-macos/restart_app/Sources/restart_app/
-└── RestartAppPlugin.swift  # macOS implementation (NSWorkspace)
+## Prepare a pull request
 
-windows/
-└── restart_app_plugin.cpp  # Windows implementation (CreateProcessW)
-```
+- Keep one feature or fix per pull request and avoid unrelated formatting.
+- Run `flutter analyze` and the tests relevant to the change.
+- Run the affected platform when changing native restart behavior. Record the
+  device or simulator, OS, build mode, and result.
+- Update the documentation and `CHANGELOG.md` for user-facing changes.
+- Leave version changes to the release process.
 
-All platforms communicate over a single `MethodChannel` named `restart`.
+The [verification guide](.github/ci/verification.md) has the commands for unit
+tests, compatibility checks, native restarts, browser behavior, and documentation.
+A restart check must observe the new Dart boot as well as the accepted request.
 
-## Platform Notes
+## Maintain package skills
 
-- **Android**: Uses `ActivityAware` to get a reference to the current activity. It relaunches the main activity with package-manager launcher intents. The `forceKill` option terminates the old process after the new activity starts.
-- **iOS**: iOS has no public API for automatic full process restart. The recommended path is opt-in Flutter engine restart: the host app provides plugin registration, the plugin creates a fresh `FlutterEngine`, runs Dart again, replaces the root `FlutterViewController`, and destroys the old engine context. The notification + `exit(0)` flow remains only as a legacy fallback.
-- **Web**: Reloads the current URL by default. A hash-only destination updates `window.location.hash` and reloads. Other destinations resolve against `document.baseURI`: same-document URLs replace the current history entry and reload; different documents use `window.location.replace`.
-- **macOS**: Uses `NSWorkspace` to launch a new app instance, then terminates the current process.
-- **Linux**: Uses `execv` to replace the current process.
-- **Windows**: Uses `CreateProcessW` to launch a new instance, then exits the current process.
+Consumer instructions live in `skills/`, with one `SKILL.md` in each
+`restart-app-*` directory. Match the frontmatter name to its directory, keep
+referenced material inside the skill, and make Dart examples complete enough to
+analyze on their own. Update the relevant skill when an API or platform contract
+changes.
 
-## PR Checklist
+Run the [packaged skills check](.github/ci/verification.md#package-skills) to
+verify discovery, repeated installation, file contents, and Dart examples.
 
-- One feature or fix per PR. Keep scope tight.
-- `flutter analyze` must pass with no issues.
-- Test on the affected platform(s) before opening.
-- Update `CHANGELOG.md` if the change is user-facing.
-- Do not bump version numbers — that is handled during release.
-- Match existing code style. No reformatting unrelated files.
+## Report a problem
 
-## Reporting Issues
+Use the [bug report template](https://github.com/gabrimatic/restart_app/issues/new?template=bug_report.md)
+and include the package and Flutter versions, platform, restart options, and a
+small reproduction. For a feature request, explain the use case and expected
+behavior.
 
-Use the [bug report template](https://github.com/gabrimatic/restart_app/issues/new?template=bug_report.md). Include your Flutter version, target platform, and steps to reproduce.
-
-## Vulnerability Reporting
-
-See [SECURITY.md](SECURITY.md). Do **not** open public issues for security vulnerabilities.
-
-## Package skills
-
-Consumer instructions live under `skills/`, with one `SKILL.md` per
-`restart-app-*` directory. Keep the frontmatter name equal to the directory name.
-Bundle conditional reference material inside that skill so installed copies
-remain self-contained. Update the relevant instructions when changing an API or
-platform contract.
-
-Verify discovery, installation, and Dart examples with a current stable Flutter
-SDK and Python 3:
-
-```bash
-python3 .github/ci/check_skills.py
-```
-
-This uses a temporary consumer with a path dependency, installs the skills with
-the Dart Skills CLI, compares the installed files, and analyzes all Dart code
-blocks as standalone libraries. Keep those examples complete and compilable.
-`dart pub publish --dry-run` must also include the skill files.
-
-## Runtime verification
-
-Follow the [restart verification guide](.github/ci/verification.md) for repeatable
-Android, iOS, desktop, and browser checks. Save state before each restart and
-require a fresh boot marker afterward. A green build or mocked channel test is
-not evidence that the native application relaunched.
+Report vulnerabilities privately through the process in
+[SECURITY.md](SECURITY.md).

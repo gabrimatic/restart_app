@@ -1,40 +1,36 @@
 ---
-title: restart_app
-description: Restart or relaunch a Flutter app from Dart with one call.
+title: Flutter app restarts
+description: Restart modes, platform setup, and AI agent skills for Flutter apps.
 ---
 
-`restart_app` gives Flutter apps a single Dart API for restarting or relaunching across Android, iOS, web, macOS, Linux, and Windows.
-
-The plugin uses platform-specific restart or reload behavior. The package returns a structured `RestartResult` so you can handle unsupported modes, denied permissions, or platform limits without guessing.
-
-On iOS, complete the [host setup](/product/ios-engine-restart/) first. Persist required state and await pending writes, then call from an async app action on the main isolate:
+`restart_app` lets you restart your Flutter app from Dart on Android, iOS, web, macOS, Linux, and Windows.
 
 ```dart
 import 'package:restart_app/restart_app.dart';
 
-final result = await Restart.restartApp();
-
-if (!result.success) {
-  // Show or log result.code and result.message.
-}
+await Restart.restartApp();
 ```
 
-## What it handles
+iOS requires [AppDelegate setup](/product/ios-engine-restart/) to register plugins with each new Flutter engine. For installation and requirements, see the [quickstart](/quickstart/).
 
-- Android activity relaunch, including Android TV and Fire TV launcher fallback.
-- iOS Flutter engine restart when the host app registers plugins for a new engine.
-- Optional iOS notification fallback when a user-tap relaunch is acceptable.
-- Web page reload through `window.location`.
-- macOS and Windows process relaunch where app packaging permits it.
-- Linux `execv` process replacement.
+## Features
 
-## Requirements
+- **Android:** relaunch the main activity or restart the app process, including on Android TV and Fire TV.
+- **iOS:** start a new Flutter engine without closing the app.
+- **Web:** reload the Flutter app at the same URL or a destination you choose, with JavaScript and WebAssembly support.
+- **Desktop:** relaunch macOS and Windows apps or replace the running Linux process.
+- **Error handling:** read restart results and check the modes available on each platform.
+- **AI agent skills:** install package-specific integration and iOS setup instructions for your coding agent.
 
-- Dart SDK `>=3.4.0`
-- Flutter `>=3.22.0`
+## Guides
 
-## Next steps
+| Guide | What you'll find |
+| --- | --- |
+| [Quickstart](/quickstart/) | Installation, basic usage, and requirements. |
+| [Platform behavior](/product/platform-behavior/) | What a restart does on each platform. |
+| [iOS engine restart](/product/ios-engine-restart/) | AppDelegate, UIScene, and custom app integration. |
+| [Configuration](/reference/configuration/) | Restart modes, web destinations, and saved data. |
+| [API reference](/reference/api/) | Parameters, return values, and errors. |
+| [AI agent skills](/agent-skills/) | Installation and updates for the bundled skills. |
 
-- Start with the [quickstart](/quickstart/).
-- Check [platform behavior](/product/platform-behavior/) before shipping a restart flow.
-- Configure [iOS engine restart](/product/ios-engine-restart/) when your app targets iOS.
+The [example app](https://github.com/gabrimatic/restart_app/tree/master/example) demonstrates each restart mode and shows how saved data and other plugins behave after a restart.

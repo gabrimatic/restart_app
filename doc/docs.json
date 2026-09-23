@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "restart_app",
-  "description": "Flutter package documentation for restarting or relaunching apps with platform-specific native behavior.",
+  "description": "Restart Flutter apps on mobile, web, and desktop. Guides for platform setup, restart modes, web routes, and AI agent skills.",
   "colors": {
     "primary": "#2563eb",
     "light": "#60a5fa",
@@ -20,7 +20,7 @@
         ]
       },
       {
-        "group": "Product",
+        "group": "Guides",
         "pages": [
           "product/platform-behavior",
           "product/ios-engine-restart",
@@ -40,7 +40,7 @@
   "navbar": {
     "links": [
       {
-        "label": "Pub.dev",
+        "label": "pub.dev",
         "href": "https://pub.dev/packages/restart_app"
       },
       {

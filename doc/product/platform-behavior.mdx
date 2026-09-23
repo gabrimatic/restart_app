@@ -1,29 +1,55 @@
 ---
 title: Platform behavior
-description: Native restart mechanism and platform limits for each supported Flutter target.
+description: How Flutter app restarts work on Android, iOS, web, macOS, Linux, and Windows, including available modes and platform limits.
 ---
 
-`restart_app` uses different mechanisms because Flutter targets do not expose the same restart primitives.
+Call `Restart.restartApp()` to use the default behavior for the platform. Set `mode` only when you need a different restart method.
 
-| Platform | Mechanism | Limitations |
-| --- | --- | --- |
-| Android | Relaunches the main activity through `PackageManager`. Supports Android TV and Fire TV through a leanback launcher fallback. `RestartMode.process` and `forceKill: true` kill the process after launch for a clean cold start. | Requires an attached activity and a launchable app entry point. A default restart does not guarantee a new native process. |
-| iOS | Recommended: opt-in Flutter engine restart that creates a new `FlutterEngine`, runs Dart again, re-registers plugins, and replaces the root `FlutterViewController` in the same iOS process. Legacy: local notification, `exit(0)`, and user tap. | iOS has no public API for automatic full process restart. Engine restart is not a process restart and cannot reset native singleton state. Legacy fallback requires notification permission and user action. |
-| Web | Reloads the current document or navigates to `webOrigin`. Hash-only and same-document URL destinations also reload. | Persist state first. Relative URLs resolve against `document.baseURI`; the host must serve the destination route. See [web destinations](/reference/api/#web-destinations) for history behavior. |
-| macOS | Launches a new instance through `NSWorkspace` and terminates the current process. | Test the signed distribution you ship, including sandbox and termination delegates. Launch failures return `RESTART_FAILED`; a host termination veto can leave the old instance running. |
-| Linux | Replaces the current process through `execv`. | The executable must remain accessible. The PID can stay the same because `execv` replaces the process image. Configure argv preservation if needed. |
-| Windows | Launches a new instance through `CreateProcess` and terminates the current process. | Uses the desktop process-launch path, not package activation APIs. Test MSIX/Store packaging separately; launch restrictions return `RESTART_FAILED`. |
+| Platform | Supported modes |
+| --- | --- |
+| Android | `platformDefault`, `process` |
+| iOS | `platformDefault`, `flutterEngine`, `notificationFallback` |
+| Web | `platformDefault` |
+| macOS, Linux, Windows | `platformDefault`, `process` |
 
-## Choose a mode
+An unsupported mode returns a failed `RestartResult`. Use [`Restart.restartCapability()`](/reference/api/#restart-restartcapability) to check support at runtime.
 
-Use `RestartMode.platformDefault` unless your app has a reason to request a specific behavior.
+## Android
 
-```dart
-await Restart.restartApp(mode: RestartMode.platformDefault);
-```
+The default restart relaunches the app's main activity and starts Flutter again. It can keep the existing Android process. Android TV and Fire TV are supported through their TV launcher entry.
 
-Use `RestartMode.process` when you explicitly want a full process relaunch on platforms that support it.
+Use `RestartMode.process` to also end the existing process. `forceKill: true` selects the same behavior. A restart requires an attached activity and an app entry that Android can launch.
 
-Use `RestartMode.flutterEngine` on iOS when the host app has configured engine restart.
+## iOS
 
-Use `RestartMode.notificationFallback` only when the iOS user-tap relaunch tradeoff is acceptable.
+The default restart creates a new Flutter engine, runs Dart again, registers plugins, and replaces the Flutter view controller. The old engine is then destroyed. `RestartMode.flutterEngine` selects this behavior explicitly.
+
+Complete the [iOS setup](/product/ios-engine-restart/) and request the restart while the app is active. The iOS process stays alive, so native globals and singletons are not reset.
+
+iOS has no public API for an automatic full process restart. The optional `RestartMode.notificationFallback` schedules a local notification and closes the app. Reopening it requires notification permission and a notification tap.
+
+## Web
+
+A restart reloads the whole Flutter web app. By default, the URL is unchanged, including its path, query, and hash. An app opened at `/settings` restarts with that URL; your router determines which screen appears.
+
+Pass `webOrigin` to choose a different URL or hash route. Despite the parameter name, it accepts destinations such as `/my-app/` and `#/home`, as well as full URLs. It also reloads the app when the destination differs only by its hash. See [web destinations](/reference/api/#web-destinations) for URL resolution and browser history.
+
+The web implementation supports both JavaScript and WebAssembly builds. With path routing, your server must serve the Flutter app at the destination URL.
+
+## macOS
+
+A restart opens a new instance through `NSWorkspace`, then asks the existing instance to quit. Both supported modes resolve to `process`.
+
+A launch failure returns `RESTART_FAILED`. The app's termination delegate can cancel or postpone quitting, leaving the old instance open. Check this behavior in your signed app, including any sandbox or unsaved-document handling.
+
+## Linux
+
+A restart runs the app executable again through `execv`, replacing the running program while keeping the same process ID. Both supported modes resolve to `process`.
+
+The executable must remain accessible. If your app uses command-line arguments, follow the [Linux setup](/reference/linux/) to keep them after a restart. If a deferred `execv` call fails, the existing app stays open and the failure is written to the native log.
+
+## Windows
+
+A restart opens a new app process through `CreateProcess` and ends the existing process. Both supported modes resolve to `process`, and the original command line is preserved.
+
+This uses standard desktop process launching. MSIX and Store apps can require package activation instead, so verify the distribution format you use. A launch restriction returns `RESTART_FAILED` before the existing process is ended.

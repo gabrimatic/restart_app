@@ -1,11 +1,11 @@
 {
-    "name": "example",
-    "short_name": "example",
+    "name": "restart_app example",
+    "short_name": "restart_app",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "restart_app example app.",
+    "description": "Try Flutter app restarts and compare saved data before and after each restart.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -2,118 +2,121 @@
 name: restart-app-integration
 description: >-
   Integrate or troubleshoot Flutter app restarts with restart_app, including
-  restart modes, structured results, web routes, desktop relaunches, and
+  restart modes, results, saved data, web routes, desktop relaunches, and
   requests from background isolates.
 ---
 
-# Integrate restart_app
+# Flutter app restart integration
 
-## API and lifecycle
+## Basic usage
 
-- Import `package:restart_app/restart_app.dart`. Use
-  `Restart.restartApp()`, which returns `Future<RestartResult>`, not a boolean.
-  Do not invent `Restart.restart()`, a restart widget, or an initialization API.
-- Prefer the default mode. Select an explicit mode only for a supported target.
-  Read `Restart.restartCapability()` when the UI needs to offer specific modes.
-  Its flags describe platform support, not a guarantee that the next call will
-  succeed. Web supports default reload even though all three restart flags are
-  false.
-- Persist required state and await pending writes **before** requesting restart.
-  Restart does not clear preferences, databases, files, or authentication.
-  Do not depend on code after the call to complete essential work.
-- Inspect `result.success`, `result.mode`, `result.code`, and `result.message`.
-  Success means accepted and initiated, not proof that the replacement app ran.
-  Deferred native failures can occur after success; inspect native logs and
-  verify a new launch or engine boot when debugging.
-- Platform errors become failed results. Missing registration returns
-  `MISSING_PLUGIN`; capability reports unavailable support with a reason. Fix
-  plugin registration and rebuild after adding native dependencies. Initialize
-  the Flutter binding before using channels before `runApp`; binding errors
-  still require caller setup. Do not silently retry a missing plugin.
-- Route background-worker restart signals to the main isolate using a
-  `SendPort`/`ReceivePort`. Request iOS engine restart while the app is active.
-- Prevent repeated taps while a restart is pending. Check `context.mounted`
-  before updating UI after an await. Do not create an automatic restart loop.
+Import `package:restart_app/restart_app.dart` and call `Restart.restartApp()`.
+It returns `Future<RestartResult>`. There is no restart widget, initialization
+method, or `Restart.restart()` API.
 
-## Example
-
-Call this from an app action on the main isolate. Supply the app's existing
-persistence function; a save failure must prevent the restart.
+Use the default mode unless the app needs a particular restart method. Check
+`Restart.restartCapability()` when presenting a choice of modes. Its flags
+report platform support; they do not guarantee that a restart will succeed.
+Web supports the default restart even though its three restart flags are false.
 
 ```dart
 import 'package:flutter/material.dart';
 import 'package:restart_app/restart_app.dart';
 
-Future<void> saveAndRestart(
-  BuildContext context,
-  Future<void> Function() savePendingChanges,
-) async {
-  await savePendingChanges();
+Future<void> restartFromButton(BuildContext context) async {
   final result = await Restart.restartApp();
   if (!context.mounted || result.success) return;
 
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text(result.message ?? result.code ?? 'Restart could not start.'),
+      content: Text(result.message ?? result.code ?? 'Could not restart the app.'),
     ),
   );
 }
 ```
 
-Handle save errors in the caller's normal error UI. Disable its restart action
-while this operation is pending.
+## State and errors
 
-An overlapping native request fails with `RESTART_ALREADY_IN_PROGRESS` on
-Android and desktop, or `IOS_RESTART_ALREADY_IN_PROGRESS` on iOS. Handle it as
-a pending restart, not as a reason to loop or switch modes.
+- If the app has unsaved changes that must survive, finish saving them through
+  its existing storage code before restarting. Follow that storage API's
+  durability guarantees. A failed save must not trigger a restart.
+- A restart does not erase preferences, files, databases, or stored credentials.
+  Do not rely on code after the restart call to finish essential work.
+- Read `success`, `mode`, `code`, and `message`. Success means the platform
+  accepted the request. A later native failure can leave the old app running;
+  inspect native logs when startup does not run again.
+- Platform errors return failed results. `MISSING_PLUGIN` means native
+  registration is missing: fix registration and rebuild the app. If calling
+  before `runApp`, initialize the Flutter binding before using the channel.
+- Disable repeated restart actions once a request starts. Keep them disabled
+  after acceptance; allow another attempt if the request fails. Check
+  `context.mounted` before updating UI after an await. Do not retry in a loop.
+- Overlapping requests return `RESTART_ALREADY_IN_PROGRESS` on Android and
+  desktop, or `IOS_RESTART_ALREADY_IN_PROGRESS` on iOS. Wait for the existing
+  request rather than switching modes.
+- Send background-worker requests to the main isolate through a
+  `SendPort`/`ReceivePort`. Request iOS engine restart while the app is active.
 
-## Platform decisions
+## Platform behavior
 
-| Target | Supported modes | Integration details |
+| Platform | Modes | Behavior |
 | --- | --- | --- |
-| Android | `platformDefault`, `process` | Default relaunches the launcher activity. `process` or `forceKill: true` additionally terminates the old process. A foreground activity and launch intent are required; TV uses a leanback fallback. |
-| iOS | Configured `platformDefault`, `flutterEngine`; explicit `notificationFallback` | Default requires native engine setup. Read the bundled `restart-app-ios-engine-restart` skill for host integration. Full process restart is unsupported. |
-| Web | `platformDefault` only | Null or empty `webOrigin` reloads the current URL. `#/home` changes the hash and reloads. Full or relative URLs targeting the same document replace the current history entry and reload; different documents use location replacement. Do not request `process`. |
-| macOS | `platformDefault`, `process` | Resolves to `process`. Uses `NSWorkspace` to launch a new instance, then terminates the old one. Check actual distribution and sandbox constraints. |
-| Linux | `platformDefault`, `process` | Resolves to `process`. Uses `execv`; the PID can stay the same. Preserve arguments as described below when needed. |
-| Windows | `platformDefault`, `process` | Resolves to `process`. Uses `CreateProcessW` and retains the command line. MSIX/Store packaging can prevent relaunch. |
+| Android | `platformDefault`, `process` | Default relaunches the main activity. `process` or `forceKill: true` also ends the old process. Requires an attached activity and launch intent; Android TV and Fire TV launcher entries are supported. |
+| iOS | `platformDefault`, `flutterEngine`, `notificationFallback` | Default and engine modes require AppDelegate configuration. Use the bundled `restart-app-ios-engine-restart` skill. Automatic full process restart is unavailable. |
+| Web | `platformDefault` | Reloads the whole Flutter web app at the same browser URL by default. `webOrigin` selects a different destination. |
+| macOS | `platformDefault`, `process` | Opens a new instance through `NSWorkspace`, then asks the old instance to quit. Both modes resolve to `process`. |
+| Linux | `platformDefault`, `process` | Replaces the running program through `execv` while keeping its process ID. Both modes resolve to `process`. |
+| Windows | `platformDefault`, `process` | Opens a new process through `CreateProcessW` and ends the old process. Preserves the command line. Both modes resolve to `process`. |
 
-Unsupported modes fail instead of silently choosing another mode. `forceKill`
-is Android-only. Notification title/body only customize the explicit iOS
-notification fallback; they do not enable it. Never substitute notification
-fallback automatically after iOS engine setup fails.
+Unsupported modes return a failure. `forceKill` only affects Android.
+Notification title and body only customize the explicit iOS notification mode;
+they do not select it. Never switch to notification fallback automatically when
+iOS engine setup is missing.
 
-For Linux apps that need their original arguments, update the existing
-`linux/runner/main.cc` (`linux/main.cc` in older Flutter projects), before
-starting the Flutter engine:
+On macOS, a termination delegate can prevent the old instance from quitting.
+Windows MSIX/Store packaging can restrict standard process launching. Check
+restart behavior in the app's actual distribution format.
 
-Include `<restart_app/restart_app_plugin.h>` and call
-`restart_app_plugin_store_argv(argc, argv)` inside the existing
-`main(int argc, char** argv)`. Keep the runner code. Flutter's generated plugin
-rules link the runner to `restart_app_plugin`. If the runner has custom plugin
-wiring, ensure this link exists in `linux/CMakeLists.txt`, after
-`include(flutter/generated_plugins.cmake)`:
+## Web destinations
+
+Without `webOrigin`, or with an empty value, the full browser URL stays the
+same, including path, query, and hash. The Flutter app starts again; its router
+decides which screen to show. Restarting at `/settings` does not navigate to `/`.
+
+- A hash route such as `#/home` changes the fragment and reloads. It adds a
+  browser history entry if the fragment changes.
+- Full and relative URLs replace the current history entry. If the destination
+  is the same document, it still reloads, including when its fragment changes
+  or is removed.
+- Relative URLs resolve against `document.baseURI`, including an HTML `base`
+  element. `/` means the website root, not necessarily the Flutter app's root.
+
+With path routing, verify that the server serves the app at the destination URL.
+
+## Linux arguments
+
+To keep command-line arguments, edit the app's existing
+`linux/runner/main.cc` (`linux/main.cc` in older Flutter projects). Include
+`<restart_app/restart_app_plugin.h>` and call
+`restart_app_plugin_store_argv(argc, argv)` inside `main`, before starting Flutter.
+Keep the existing runner code.
+
+Flutter's generated plugin rules link the runner to `restart_app_plugin`.
+For custom plugin wiring, ensure this link exists in `linux/CMakeLists.txt`,
+after `include(flutter/generated_plugins.cmake)`:
 
 ```cmake
 target_link_libraries(${BINARY_NAME} PRIVATE restart_app_plugin)
 ```
 
-Without this opt-in, Linux restarts with only the executable argument.
-
-Relative web destinations resolve against `document.baseURI`, including any
-HTML `base` element. Hash-only input adds a history entry when the fragment
-changes; full or relative URL input replaces the current history entry, even
-when only its fragment changes. Verify the deployed host serves the destination
-route.
+Without this setup, the restarted app receives only the executable argument.
 
 ## Verification
 
-Mock `MethodChannel('restart')` for Dart tests to assert requested options and
-success/error UI without restarting the test runner. Native methods are
-`restartApp` and `restartCapability`. Clear mock handlers after each test.
-Mocks do not prove native restart behavior.
+For Dart tests, mock `MethodChannel('restart')` and its `restartApp` and
+`restartCapability` methods. Check request options and error UI, then clear the
+mock handlers. Run the app separately to verify actual restarts.
 
-Run the actual target app, persist a launch marker, request restart, and check
-that startup runs again. Verify saved state survives and temporary Dart state
-resets. On iOS also verify plugin channels and platform views after repeated
-engine restarts. Test the distribution build when packaging affects relaunch.
+Save a launch marker, request a restart, and confirm that startup runs again,
+saved data remains, and temporary Dart state resets. On iOS, also check plugin
+calls and platform views after repeated engine restarts.

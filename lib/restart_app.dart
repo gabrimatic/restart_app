@@ -2,7 +2,7 @@ import 'package:flutter/services.dart';
 
 /// Restart behavior requested by the caller.
 enum RestartMode {
-  /// Uses the best behavior available for the current platform.
+  /// Uses the default restart method for the current platform.
   platformDefault,
 
   /// Recreates the Flutter engine in the same native process where supported.
@@ -31,7 +31,9 @@ class RestartCapability {
     this.reason,
   });
 
-  /// Whether this platform can relaunch the app in a fresh native process.
+  /// Whether this platform supports a native process restart.
+  ///
+  /// Linux replaces the running program while keeping the same process ID.
   final bool fullProcessRestart;
 
   /// Whether this platform can recreate Flutter in the current native process.
@@ -75,7 +77,7 @@ class RestartResult {
   /// Whether the platform accepted and initiated the requested restart.
   final bool success;
 
-  /// The mode that was accepted by the platform.
+  /// The resolved mode on success, or the requested mode on failure.
   final RestartMode mode;
 
   /// Platform-specific error code, when [success] is false.
@@ -116,7 +118,7 @@ class RestartResult {
   }
 }
 
-/// Entry point for restart and relaunch operations.
+/// Restarts Flutter apps on Android, iOS, web, macOS, Linux, and Windows.
 class Restart {
   static const MethodChannel _channel = MethodChannel('restart');
 
@@ -148,15 +150,15 @@ class Restart {
     );
   }
 
-  /// Restarts the Flutter application and returns a structured result.
+  /// Requests an app restart and returns its acceptance or error details.
   ///
-  /// By default, this uses the best supported behavior for the current
-  /// platform. Pass [mode] when you want a specific restart path, such as
+  /// Uses the platform's default restart method. Pass [mode] to request
   /// [RestartMode.process], [RestartMode.flutterEngine], or
   /// [RestartMode.notificationFallback].
   ///
-  /// The [webOrigin] parameter is web-only. Null or empty reloads the current
-  /// URL. A hash-only value such as `#/home` updates the fragment and reloads,
+  /// On web, null or empty [webOrigin] reloads the whole Flutter app at the
+  /// same browser URL. The app's router determines which screen appears.
+  /// A hash-only value such as `#/home` updates the fragment and reloads,
   /// adding a history entry when the fragment changes. Other values resolve
   /// against `document.baseURI`, including any HTML `base` element. A full or
   /// relative URL targeting the same document replaces the current history
@@ -168,12 +170,12 @@ class Restart {
   /// [RestartMode.platformDefault] use the notification fallback.
   ///
   /// The [forceKill] parameter is Android-only. When true, the old process is
-  /// terminated after the new activity starts. [RestartMode.process] enables
-  /// this path automatically on Android.
+  /// terminated after requesting the activity launch. [RestartMode.process]
+  /// enables this path automatically on Android.
   ///
   /// A successful result means the platform accepted and initiated the
-  /// restart. On Android, iOS, Linux, and Windows, the actual replacement
-  /// completes after the result arrives. A deferred failure is logged natively
+  /// restart. On Android, iOS, Linux, and Windows, replacement work runs after
+  /// the native response is sent. A deferred failure is logged natively
   /// and cannot change the result already returned to Dart.
   static Future<RestartResult> restartApp({
     RestartMode mode = RestartMode.platformDefault,

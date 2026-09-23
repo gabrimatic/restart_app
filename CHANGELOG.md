@@ -1,213 +1,166 @@
+## 1.10.1
+
+* Simplified the README, guides, examples, and changelog; corrected documentation links.
+* Clarified web routes, iOS setup, restart results, and Android requirements.
+* Improved package descriptions and AI agent guidance, with a new documentation index.
+
 ## 1.10.0
 
-* Reload the web document when an absolute or relative restart URL changes only its fragment, including identical URLs and fragment removal
-* Preserve replacement history and HTML base URL resolution for web restart destinations
-* Require a mounted WebView JavaScript handshake and previous-boot file and SQLite data in the example's restart checks
-* Simplify the README around installation, usage, and required iOS setup; link detailed platform and configuration guides
-* Document awaited state persistence and complete background-isolate coordination with cleanup and failure handling
-* Correct Linux runner paths and distinguish standard plugin linking from custom-runner setup
-* Remove the retired popularity badge, correct the funding image's accessible label, and verify image content as well as transport status
-* Fix quoted HTML and CSS resource paths and uppercase or invalid numeric entities in the static documentation export
-* Restore the documentation theme icon, use the configured blue palette in both themes, and check all exported pages and interactive controls at desktop and mobile viewport sizes
-* Include package ignore rules and dependency lockfile changes in CI; restrict documentation deployment to the master branch
-* Add candidate-package origin checks so release consumers and installed skills can be verified against the exact packaged files
-* Add sustained native restart checks with lifecycle transitions, Android activity recreation, iOS engine and view lifetime checks, and desktop process cleanup
-* Exercise repeated JavaScript and WebAssembly restarts across URL forms, browser history, tab switching, and opaque-origin frames with parent-held state
+* Fixed web restarts for identical URLs and fragment changes, including fragment removal.
+* Preserved browser history replacement and HTML base URL resolution for restart destinations.
+* Fixed documentation theme icons and resource loading in the static site.
+* Improved the example's saved-data checks and restart testing across all six platforms.
 
 ## 1.9.2
 
-Released September 23, 2026.
-
-* Bundled versioned agent skills for restart integration and iOS engine configuration, installable with `dart run skills@ get restart_app`
-* Added complete skill references for restart modes, structured results, saved state, web routes, background isolates, and iOS lifecycle and failure handling
-* Return a failed `MISSING_PLUGIN` result when native registration is absent, and report unavailable capabilities for missing or malformed channel responses
-* Reject overlapping native restart requests across plugin instances, including races between iOS engine and notification restarts; release pending state when a restart fails
-* Fixed iOS engine reconfiguration retaining a previous custom view-controller installer; omitting the installer now restores the default root protection
-* Restrict automatic iOS window selection to active scenes, respect a `windowProvider` that returns `nil` instead of selecting another scene, and reject unknown native restart modes
-* Preserve an in-flight iOS fallback notification when another Flutter engine registers plugins
-* Keep the Linux application alive if a deferred `execv` fails; bound saved command-line arguments by `argc` and release replaced argument storage
-* Handle Windows relaunch scheduling failures before reporting success, and clean up the suspended child and native handles on failure
-* Treat an empty macOS application launch result as a failed restart
-* Migrated the iOS example to Flutter's UIScene lifecycle for current Xcode and iOS, with native regression tests for engine failures, repeated requests, and custom hosts
-* Restore example controls after storage or restart failures, require successful state writes before restart, add Android release network permission, and avoid counting skipped platform probes as successful checks
-* Expanded compatibility checks across minimum and current Flutter SDKs, CocoaPods and SwiftPM, and AGP 9 with and without built-in Kotlin
-* Added repeated real desktop restart checks with fresh run identities, process IDs, saved state, concurrent requests, argument preservation, and failure recovery, plus Android and browser runtime probes
-* Restored search, code copying, mobile navigation, and appearance controls in the static documentation site
-* Updated platform limits, host configuration, SDK requirements, and skill installation guidance; the plugin's minimum Dart, Flutter, and native OS versions remain unchanged
+* Added bundled AI agent skills for restart integration and iOS engine setup.
+* Return `MISSING_PLUGIN` when native registration is missing, and handle invalid capability responses.
+* Reject overlapping restart requests and allow retry after a failed restart.
+* Fixed iOS custom-window selection, engine reconfiguration, and notification handling across engine registrations.
+* Keep Linux running if relaunch fails; clean up failed Windows launches and report macOS launch failures.
+* Updated the example for UIScene and expanded compatibility checks for Flutter, CocoaPods, SwiftPM, and AGP 9.
 
 ## 1.9.1
 
-* Fixed the Android build failing on AGP 9 with `Could not find method kotlin()`, which hit every project generated by Flutter 3.44 and later ([#56](https://github.com/gabrimatic/restart_app/issues/56))
-* Changed how the plugin decides to apply the Kotlin Gradle Plugin: it now checks whether Kotlin has already been provided instead of reading the AGP major version, so AGP 9 with `android.builtInKotlin=false` gets a Kotlin toolchain like every other combination
-* Kept the Android `namespace` unconditional now that every supported AGP requires it
-* Added a CI job that builds a fresh app against AGP 9.0 and AGP 9.1 on their matching Gradle versions
+* Fixed AGP 9 builds failing with `Could not find method kotlin()`, including Flutter 3.44 projects ([#56](https://github.com/gabrimatic/restart_app/issues/56)).
+* Support Kotlin configuration with AGP 9's built-in Kotlin either enabled or disabled.
 
 ## 1.9.0
 
-**Upgrade notes:** Android `minSdk` rises from 16 to 21 and the Android toolchain moves to Java 17, AGP 8.1.4 and Kotlin 2.0.21; the iOS CocoaPods minimum rises from 11.0 to 12.0. Apps on older toolchains must update their build setup before upgrading. On web, the default restart now reloads the current page instead of navigating to the site origin root; pass `webOrigin` to keep the previous behavior.
+**Upgrade notes:** Android now requires API 21, Java 17, AGP 8.1.4, and Kotlin 2.0.21. The iOS CocoaPods minimum is now iOS 12. Update older build configurations before upgrading.
 
-* Changed the web default restart to reload the current page, keeping the active route instead of jumping to the origin root; `webOrigin` still overrides the target
-* Fixed Windows so a failed relaunch (for example MSIX/Store-packaged apps) returns a `RESTART_FAILED` error instead of a false success; the new instance now starts suspended and only resumes after the result is delivered
-* Made unknown platform response modes fall back to the requested mode instead of silently reporting `platformDefault`
-* Hardened result parsing so non-string `code`, `message`, and `reason` values can never throw
-* Added web plugin tests that cover the full method-channel contract, plus a Chrome test step in CI
-* Added CI restart proofs that build, run, and verify a real process restart on Linux, Windows, and macOS runners
-* Added explicit engine restart, force-kill restart, and `webOrigin` buttons to the example app
-* Fixed the example Android manifest so `url_launcher` link checks pass on Android 11+ (package visibility `<queries>`)
-* Removed the redundant Android `finishAffinity()` after the relaunch intent, which made ActivityTaskManager log a "Duplicate finish request" on every default restart
-* Prepared the Android build for Flutter's Built-in Kotlin: the Kotlin Gradle Plugin is now applied only on AGP versions below 9, with modernized Kotlin 2.0 tooling
-* Aligned the iOS CocoaPods minimum with Swift Package Manager at iOS 12
-* Made the macOS handler hop to the main thread explicitly before touching AppKit
+**Web behavior change:** a restart now keeps the browser URL instead of opening the website root. Pass `webOrigin: '/'` to restart at the website root.
+
+* Fixed Windows relaunch failures returning success.
+* Preserved the requested mode when a platform returns an unknown mode, and handled malformed result fields.
+* Fixed duplicate Android activity termination and prepared Kotlin setup for AGP 9.
+* Aligned the iOS minimum across CocoaPods and SwiftPM, and moved macOS AppKit calls to the main thread.
+* Added restart-mode examples and browser and desktop restart tests.
 
 ## 1.8.3
 
-* Made `Restart.restartApp(...)` the single Dart restart entry point
-* Changed `Restart.restartApp(...)` to return `RestartResult`, giving one call with `success`, resolved `mode`, `code`, and `message`
-* Kept all restart customization on `Restart.restartApp(...)`: `mode`, `webOrigin`, `forceKill`, `notificationTitle`, and `notificationBody`
-* Refined the example so `main.dart` shows the restart calls directly, while package survival checks live in focused helper files
-* Updated README and example docs so the quick start is platform-neutral and iOS details stay in the iOS section
+* **API change:** removed `Restart.restart()`. Use `Restart.restartApp()`, which now returns `Future<RestartResult>` instead of `Future<bool>`.
+* Kept all options on that method: `mode`, `webOrigin`, `forceKill`, `notificationTitle`, and `notificationBody`.
+* Simplified the example and setup documentation.
 
 ## 1.8.2
 
-* Tightened iOS default behavior: `platformDefault` now fails cleanly when engine restart is not configured instead of quietly using notification + `exit(0)`
-* Kept notification restart as an explicit `RestartMode.notificationFallback` path for apps that accept the permission prompt, exit, and user-tap tradeoff
-* Removed the internal implicit-fallback flag from the Dart API and iOS platform-channel payload
-* Expanded the example with package checks that exercise common plugin paths after restart
-* Clarified README language around iOS engine restart versus unsupported full process restart
+* Return a failed result when iOS engine restart is not configured, instead of falling back to notifications.
+* Removed `iosLegacyNotificationFallback`; use `RestartMode.notificationFallback` to request notification relaunch.
+* Added example checks for plugins after a restart.
 
 ## 1.8.1
 
-* Fixed mode handling so unsupported restart modes fail with a clear platform error instead of silently falling back
-* Returned the resolved restart mode from Android, web, Linux, macOS, and Windows
-* Made Android `RestartMode.process` use the full `forceKill` path automatically
-* Updated the example Android Gradle project for current Java and Flutter toolchains
-* Moved the iOS `beforeRestart` hook before replacement engine creation so apps can clean up native resources first
+* Reject unsupported modes and return the resolved mode on supported platforms.
+* Made Android `RestartMode.process` use the force-kill path.
+* Run the iOS `beforeRestart` hook before creating the replacement engine.
+* Updated the example's Android build tools.
 
 ## 1.8.0
 
-* Added structured restart types with `RestartResult`, `RestartMode`, and `Restart.restartCapability()`
-* Added opt-in iOS Flutter engine restart: fresh `FlutterEngine`, Dart entrypoint rerun, host plugin registration, root `FlutterViewController` replacement, and old engine teardown
-* Kept the existing iOS notification + `exit(0)` behavior as an explicit legacy fallback
-* Documented the important iOS boundary: Flutter engine restart is supported, automatic full process restart is not available through public iOS APIs
+* Added `RestartResult`, `RestartMode`, and `Restart.restartCapability()`.
+* Added iOS Flutter engine restart with native configuration, plugin registration, and old-engine cleanup.
+* Kept notification relaunch as an explicit fallback. Automatic full process restart remains unsupported on iOS.
 
 ## 1.7.3
 
-* Fixed Xcode build failure caused by SPM target path resolving outside the package root ([#52](https://github.com/gabrimatic/restart_app/issues/52))
+* Fixed the SwiftPM target path causing Xcode build failures ([#52](https://github.com/gabrimatic/restart_app/issues/52)).
 
 ## 1.7.2
 
-* Fixed Swift Package Manager file locations for iOS and macOS
+* Fixed SwiftPM file locations for iOS and macOS.
 
 ## 1.7.1
 
-* Added Swift Package Manager support for iOS and macOS
+* Added Swift Package Manager support for iOS and macOS.
 
 ## 1.7.0
 
-* Added native Linux support. Restarts via `execv`, replacing the current process in-place
-* Added native Windows support. Launches a new instance via `CreateProcess` and exits
-* Added Android TV and Fire TV support via leanback launcher fallback
-* `restartApp()` now returns `false` on native errors instead of throwing `PlatformException`
-* Added CI with code quality checks, formatting, and native linting (Kotlin, Swift, C++)
-* Added unit tests
+* Added Linux and Windows support.
+* Added Android TV and Fire TV support.
+* Changed native failures to return `false` instead of throwing `PlatformException`.
+* Added automated checks and unit tests.
 
 ## 1.6.0
 
-* Added native macOS support via a Swift plugin. Restarts the app by launching a new instance using `NSWorkspace` and terminating the current process
+* Added native macOS app relaunch support.
 
 ## 1.5.2
 
-* Fixed Android FlutterJNI detached error: all destructive restart operations are now deferred via a short delay so the platform channel result can be delivered to the Dart side before the Flutter engine is torn down
-* Lowered minimum Dart SDK requirement from 3.5.1 to 3.4.0 (Flutter 3.22+)
-* Improved README: corrected iOS provisioning profile guidance, removed inaccurate CFBundleURLTypes instructions, and added documentation for calling from background isolates
+* Fixed Android FlutterJNI errors by delivering the result before tearing down the engine.
+* Lowered the Dart minimum to 3.4.0 (Flutter 3.22 or later).
+* Corrected iOS setup instructions and documented background-isolate use.
 
 ## 1.5.1
 
-* Added `forceKill` option for Android. Fully terminates the process after restart for a clean cold start
-* Fixed iOS restart not working due to incorrect AppDelegate cast
-* Implemented proper iOS restart using local notifications with permission handling
-* **Breaking (iOS):** Returns a `PlatformException` with code `NOTIFICATION_DENIED` if notification permission is denied. Handle this in your code
-* Removed unused `plugin_platform_interface` dependency
-* Fixed iOS podspec placeholder metadata
-* Fixed nested MaterialApp in example app
-* Improved web error handling for unrecognized method calls
-* Cleaned up unused imports
+* Added Android `forceKill` and fixed iOS notification relaunch.
+* **Breaking change on iOS:** denied notification permission now throws `PlatformException` with code `NOTIFICATION_DENIED`.
+* Removed the unused `plugin_platform_interface` dependency and corrected package metadata and examples.
 
 ## 1.3.3
 
-* Fixed web platform crash caused by argument type mismatch ([#35](https://github.com/gabrimatic/restart_app/issues/35), [#51](https://github.com/gabrimatic/restart_app/issues/51))
-* Fixed web hash URL strategy not working ([#14](https://github.com/gabrimatic/restart_app/issues/14))
-* Fixed Android crash when launch intent is unavailable ([#50](https://github.com/gabrimatic/restart_app/issues/50))
-* Fixed iOS `restartApp()` always returning false ([#48](https://github.com/gabrimatic/restart_app/issues/48))
+* Fixed web argument parsing crashes ([#35](https://github.com/gabrimatic/restart_app/issues/35), [#51](https://github.com/gabrimatic/restart_app/issues/51)) and hash routing ([#14](https://github.com/gabrimatic/restart_app/issues/14)).
+* Fixed Android crashes when no launch intent is available ([#50](https://github.com/gabrimatic/restart_app/issues/50)).
+* Fixed iOS `restartApp()` always returning `false` ([#48](https://github.com/gabrimatic/restart_app/issues/48)).
 
 ## 1.3.2
 
-* Updated web package to the stable version
+* Updated to the stable `web` package.
 
 ## 1.3.1
 
-* Updated JVM and Kotlin versions
-* Upgraded Flutter web dependency to more compatible version
-* Resolved dependency conflicts with firebase packages and restart_app
+* Updated JVM, Kotlin, and web dependencies; resolved Firebase dependency conflicts.
 
 ## 1.3.0
 
-* Custom notification support added for iOS:
-  - `notificationTitle` and `notificationBody` can now be customized
-* Android improvements:
-  - Added namespace configuration
-  - Replaced `.exit` method with new, safe `ActivityAware` method
-  - Updated Kotlin version
-* Web support enhanced:
-  - Added Wasm support
-* General updates:
-  - Updated dependencies
+* Added custom iOS notification titles and messages.
+* Added web WebAssembly support.
+* Updated Android namespace, Kotlin, and activity handling.
 
 ## 1.2.1
 
-* In-code documentation added to the source
+* Added API documentation.
 
 ## 1.2.0
 
-* iOS support added
+* Added iOS support.
 
 ## 1.1.3
 
-* Updated to Flutter 3.10
-* Example files updated
+* Updated to Flutter 3.10 and refreshed the example.
 
 ## 1.1.2
 
-* Updated to Flutter 3.7.0
+* Updated to Flutter 3.7.
 
 ## 1.1.1+1
 
-* iOS support description added to README
+* Documented iOS support.
 
 ## 1.1.1
 
-* Gradle version updated
+* Updated Gradle.
 
 ## 1.1.0+1
 
-* Updated to Flutter 3.0.0
+* Updated to Flutter 3.0.
 
 ## 1.1.0
 
-* Web support added
+* Added web support.
 
 ## 1.0.3
 
-* Plugin version updated in README
+* Updated the README version.
 
 ## 1.0.2
 
-* Package name updated in example files
+* Updated the package name in examples.
 
 ## 1.0.1
 
-* Package name updated
+* Updated the package name.
 
 ## 1.0.0
 
-* Null-Safety support added
+* Added null safety.

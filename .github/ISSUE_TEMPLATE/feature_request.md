@@ -4,17 +4,13 @@ about: Suggest an improvement or new capability
 labels: enhancement
 ---
 
-## Summary
-
-A brief description of what you want and why.
-
 ## Problem
 
-What problem does this solve, or what limitation does it address?
+Describe what you want to do and what the package currently prevents or makes difficult.
 
-## Proposed Solution
+## Proposal
 
-How you envision this working. Include API design or behavior changes if relevant.
+Describe the behavior or API you would like. Include an example if it helps.
 
 ## Platform
 

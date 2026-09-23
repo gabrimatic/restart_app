@@ -35,7 +35,7 @@ void main() {
       'notificationFallback': false,
       'engineRestartConfigured': false,
       'platformDefaultMode': 'platformDefault',
-      'reason': 'Web restart reloads the current page.',
+      'reason': 'Web restart reloads the Flutter app at the same browser URL.',
     });
   });
 

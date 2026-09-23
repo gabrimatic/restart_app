@@ -1,12 +1,10 @@
 # iOS host setup
 
-Merge the matching setup into the existing delegate. Keep unrelated app setup.
+Configure plugin registration in `ios/Runner/AppDelegate.swift` so each replacement engine can use the app's plugins. Merge the matching example into the existing delegate and preserve unrelated initialization.
 
-## Flutter 3.41+ UIScene apps
+## UIScene apps
 
-Use this setup when your app has migrated to Flutter's UIScene lifecycle and your delegate already looks like `@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate`.
-
-Keep the normal plugin registration for the implicit app engine in `didInitializeImplicitFlutterEngine`. Add `RestartAppPlugin.configureEngineRestart` in `application(_:didFinishLaunchingWithOptions:)` so `restart_app` can register plugins on each newly created engine:
+Use this example if your app uses Flutter's UIScene lifecycle, which is the default for new apps since Flutter 3.41. Keep the initial engine's plugin registration in `didInitializeImplicitFlutterEngine`; the `configureEngineRestart` callback registers plugins for each replacement engine.
 
 ```swift
 import UIKit
@@ -37,19 +35,11 @@ import restart_app
 }
 ```
 
-This follows Flutter's UIScene migration model: the initial engine is registered through `didInitializeImplicitFlutterEngine`, and restarted engines are registered through the `restart_app` callback above.
-
-`restart_app` selects a visible window from a foreground-active `UIWindowScene` and replaces its root `FlutterViewController`, preferring the key window. It rejects automatic selection when no active scene is available. Request restarts while the app is active. If your app has multiple scenes or a custom native shell, pass a `windowProvider` or `viewControllerInstaller` to `configureEngineRestart` so the plugin targets the correct window. A custom `windowProvider` returning `nil` fails with `IOS_NO_ACTIVE_WINDOW`; it does not fall back to another scene. Reconfiguring without a custom installer restores the default root replacement and safety checks.
-
-Complete Flutter's [UIScene migration](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate), including `UIApplicationSceneManifest` in `Info.plist`. Xcode 27 requires the scene lifecycle; the restart callback alone does not migrate the app.
-
-If you implement your own `SceneDelegate`, keep Flutter's scene lifecycle wiring there too: subclass `FlutterSceneDelegate` or conform to `FlutterSceneLifeCycleProvider`, as described in Flutter's [UISceneDelegate migration guide](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate).
+The app must also have Flutter's UIScene configuration in `Info.plist`. For an older host, complete the [Flutter UIScene migration](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate). A custom `SceneDelegate` must extend `FlutterSceneDelegate` or implement `FlutterSceneLifeCycleProvider` so Flutter receives scene callbacks.
 
 ## Classic AppDelegate apps
 
-Use this setup only when your app still registers plugins from `application(_:didFinishLaunchingWithOptions:)`. This legacy lifecycle is for older toolchains. Apps built with Xcode 27 must migrate to UIScene before they can launch.
-
-In `ios/Runner/AppDelegate.swift`:
+For an older host that registers plugins in `didFinishLaunchingWithOptions`, keep that registration and add the restart callback:
 
 ```swift
 import UIKit
@@ -76,6 +66,20 @@ import restart_app
 }
 ```
 
+This layout is for the older app lifecycle. Apps built with the iOS 27 SDK must migrate to UIScene.
+
+Rebuild the iOS app after changing Swift code. Hot reload does not apply these changes. Once configured, both `RestartMode.platformDefault` and `RestartMode.flutterEngine` recreate the engine in the existing process. Without configuration, they fail with `IOS_ENGINE_RESTART_NOT_CONFIGURED`.
+
+## Windows and native containers
+
+Request engine restart while the app is active. The default installer replaces a root `FlutterViewController` in a visible window, selected from foreground-active scenes with preference for the key window.
+
+For a host with several windows, provide `windowProvider` to select the intended one. Returning `nil` produces `IOS_NO_ACTIVE_WINDOW`; it does not select another window. For an embedded Flutter view, provide `viewControllerInstaller` to install the replacement controller in the host's container. Without it, a non-Flutter root controller produces `IOS_UNSAFE_ROOT_REPLACEMENT`.
+
+`beforeRestart` runs before the new engine is created. `afterRestart` receives the new engine after its view controller is installed, before the plugin destroys the old engine's context. Use these hooks when the host needs to release resources or reconnect custom channels. Saved data and native process-wide state remain the host's responsibility.
+
 ## Custom engines
 
-Use `RestartAppPlugin.setEngineFactory` when the host needs a custom Dart entrypoint, route, or engine configuration. The factory must return a new, running `FlutterEngine` with plugins registered for that engine. If `engine.run()` fails, throw an error instead of returning an unstarted engine. Provide a `windowProvider` and `viewControllerInstaller` for custom scene or native container ownership. Do not reuse the old engine.
+Use `RestartAppPlugin.setEngineFactory` for a custom Dart entrypoint, initial route, or engine configuration. The factory must create a new engine, start it, register its plugins, and return it. Throw if `engine.run()` fails. Never reuse the old engine.
+
+Pass the same `windowProvider` and `viewControllerInstaller` options when the host owns window selection or controller installation. Calling either configuration method again replaces the previous configuration, including custom callbacks.

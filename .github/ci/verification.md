@@ -1,33 +1,71 @@
 # Restart verification
 
-A successful method-channel result means that a restart was accepted. It does
-not prove that a replacement engine or application completed startup. These
-checks run consumer applications and require evidence from the new launch.
+A restart check must observe the new Dart boot. A successful method-channel
+response confirms that the request was accepted; startup can still fail later.
+The tools in this directory run consumer apps and collect both sides of that
+transition.
+
+Run commands from the repository root unless a section says otherwise. For a
+release, build consumers from the [candidate archive](#release-evidence).
+
+## Local checks
+
+Use the current stable Flutter SDK. Run the checks relevant to your change:
+
+```sh
+flutter pub get
+flutter analyze
+flutter test
+flutter test --platform chrome test/restart_web_test.dart
+python3 -m pip install -r .github/ci/requirements-readme-images.txt
+python3 -B -m unittest discover -s .github/ci -p 'test_*.py'
+```
+
+Run `flutter pub get` and `flutter test` from `example/` for the example tests.
+Native restart changes also need the platform checks below.
 
 ## SDK compatibility
 
-With the desired Flutter SDK on `PATH`, run:
+Put the SDK you want to check on `PATH`, then run:
 
 ```sh
 python3 .github/ci/check_compatibility.py --expected-flutter 3.22.0 --expected-dart 3.4
 ```
 
-This resolves the package as a path dependency, runs the public API regression
-suite using that SDK, analyzes the consumer, and builds its web application.
-The package's development-tool constraints do not apply to the consumer.
-CI repeats this on the minimum, transitional, and current SDKs.
+The script creates a consumer with a path dependency, runs the public API
+regressions, analyzes the consumer, and builds its web app. The package's
+repository development dependencies do not constrain that consumer. CI checks
+the minimum, transitional, and current SDKs.
 
-Apple builds separately verify CocoaPods and SwiftPM participation in the
+Apple builds separately check CocoaPods and Swift Package Manager in the
 generated dependency graph. The legacy SwiftPM check uses Flutter 3.27, where
-the experimental integration is available on stable. Flutter 3.24 stable
-ignores the SwiftPM feature option. The plugin retains its original SwiftPM
-manifest to support both generations. Current Flutter may warn about the
-newer `FlutterFramework` dependency declaration; adding it unconditionally
-would break older hosts whose generated graph does not provide that package.
+experimental integration is available on stable. Flutter 3.24 stable ignores
+the SwiftPM feature option.
+
+The plugin keeps its original SwiftPM manifest for older hosts. Current Flutter
+may warn about the newer `FlutterFramework` dependency declaration. Adding it
+unconditionally would break older generated graphs that do not provide that
+package.
+
+## Package skills
+
+Use a current stable Flutter SDK and Python 3:
+
+```sh
+python3 .github/ci/check_skills.py
+```
+
+The script creates a temporary consumer, discovers the package skills, and
+installs them twice with the Dart Skills CLI. It compares the installed files
+with the package and analyzes every Dart code block as a standalone library.
+For a release candidate, add `--package-dir /path/to/extracted-package`.
+The publication dry run must include the skill files.
 
 ## Android
 
-Build a fresh probe with a current Flutter SDK:
+### Build and run
+
+Build a disposable consumer with a current Flutter SDK, then run it on API 37:
 
 ```sh
 python3 .github/ci/build_android_consumer.py /tmp/restart_android_current \
@@ -36,73 +74,92 @@ python3 .github/ci/run_android_proof.py /tmp/restart_android_current/build/app/o
   --serial emulator-5554 --cycles 60
 ```
 
-For Android 21, put Flutter 3.22.0 on `PATH` and build with
-`--minimum --target-sdk 34` instead, then run with `--cycles 30`. The minimum consumer updates the old app
-template to the package's Java 17, AGP 8, and Kotlin 2 requirements. Current
-Flutter itself requires newer Android versions even though the plugin keeps
-its Android 21 minimum.
+For API 21, use Flutter 3.22.0 and a fresh consumer directory. Build with
+`--minimum --target-sdk 34` in place of `--target-sdk 37 --compile-minor 0`,
+then run with `--cycles 30`. The minimum consumer updates the old app template
+for the package's Java 17, AGP 8, and Kotlin 2 requirements. Current Flutter
+requires newer Android versions even though the package supports API 21.
 
-The runner installs and clears only the disposable
-`com.example.restart_android_proof` app. It requires 60 successful restarts on
-API 37 and 30 on API 21, repeating default, explicit process, and force-kill
-requests in equal counts. Each launch checks persisted state, fresh Dart state,
-process behavior, two rejected modes, and eight rejected concurrent native
-requests. The next launch requires the preceding results to have persisted.
+Use a dedicated emulator or test device. The runner installs and clears the
+disposable `com.example.restart_android_proof` app.
 
-The external controller pauses between restarts. Every five completed restarts,
-it sends the app Home and returns, requiring native and Dart lifecycle records
-plus fresh UI dumps that show the app hidden and visible. After cycles 5, 15,
-25, and so on, it rotates to landscape and back. The disposable host permits
-Activity recreation on orientation changes; the report requires Activity
-destruction and recreation, a fresh Dart boot, and an unchanged restart counter.
-Rotation boots are counted separately from plugin restarts.
+### Required results
+
+API 37 must complete 60 restarts and API 21 must complete 30. Requests repeat
+in a three-mode sequence: platform default, explicit process, and force-kill.
+Each mode must account for one third of the restarts.
+
+Every cycle checks saved state, fresh Dart state, process behavior, two rejected
+modes, and eight rejected concurrent native requests. The following launch must
+read the preceding results from disk.
+
+The controller pauses between restarts to exercise lifecycle transitions:
+
+- Every five completed restarts, send the app Home and return. Require native
+  and Dart lifecycle records, plus fresh UI dumps showing the app hidden and
+  visible.
+- After cycles 5, 15, 25, and so on, rotate to landscape and back. The disposable
+  host permits Activity recreation on orientation changes. Require Activity
+  destruction and recreation, a fresh Dart boot, and the same restart counter.
+  Record these boots separately from plugin restarts.
 
 The collector rejects stale run IDs, boot timestamps, and incomplete UI dumps.
 It saves a JSON report and screenshot, stops the disposable app, and restores
-the exact previous rotation settings, including absent values, in cleanup.
-Use a dedicated emulator or test device.
-The example app separately exercises shared preferences, SQLite, file storage,
-networking, platform views, and other plugins before and after restart.
+the previous rotation settings, including settings that were absent.
+
+The normal example also exercises preferences, SQLite, files, networking,
+platform views, and other plugins before and after restart.
 
 ## Desktop
 
-Create a Flutter desktop consumer, add a path dependency on the extracted candidate, and
-copy `restart_proof_main.dart` into its `lib/main.dart`. Before building Linux,
-wire the generated runner's original command-line arguments:
+### Build and run
+
+Create a Flutter desktop consumer, add a path dependency on the extracted
+candidate, and copy `restart_proof_main.dart` into `lib/main.dart`. Before
+building Linux, register the runner's original command-line arguments:
 
 ```sh
 python3 .github/ci/prepare_linux_proof.py /path/to/consumer
 ```
 
-Build the application, then pass its executable or macOS `.app` to the runner:
+Build the app, then pass its executable or macOS `.app` to the runner:
 
 ```sh
 python3 .github/ci/run_desktop_proof.py /path/to/restart_proof.app --cycles 30
 ```
 
-On Linux, run the command under `xvfb-run -a` if no display is available. CI
-builds all three consumers from the shared candidate archive, verifies the
-extracted file manifest and package origin around each build, and uploads that
-evidence with the runtime report. The runner clears only its named
-proof files, supplies a unique run ID, and requires 30 native restarts and 31
-launches. It checks alternating default/process modes, both rejected modes,
-concurrent-request rejection on every cycle, saved state, and fresh Dart state.
-The requested count is explicit in the persisted state and final report.
-Windows and Linux must preserve an argument containing
-spaces, quotes, and Unicode. Linux also checks preflight failure and an accepted
-restart whose `execv` fails with an invalid executable, then restores the test
-binary and requires a successful retry. The runner restores its own backup if
-the test is interrupted. Each macOS and Windows restart must change PID;
-an older PID can be reused after its process exits. Linux `execv` retains PID.
-Before cleanup, only the final process may still run the disposable
-executable. Cleanup stops only PIDs recorded by the current run after checking
-executable identity; unrecorded matching processes cause failure and are left
-alone. Raw boot records are preserved even if validation fails. A passing
-report requires all restart checks and confirmation that no owned process
-remains after cleanup.
+On Linux without a display, run the command through `xvfb-run -a`. CI builds
+all three consumers from the shared candidate archive. It checks the extracted
+manifest and resolved package origin before and after building, then uploads
+those records with the runtime report.
 
-The separate Windows native harness injects launch, event, worker, wait, and
-resume failures, checks resource cleanup, and confirms later requests recover:
+### Required results and cleanup
+
+The runner uses a unique run ID and clears only its named proof files. A run
+must complete 30 native restarts and record 31 launches. Each cycle checks
+alternating default/process modes, both rejected modes, concurrent-request
+rejection, saved state, and fresh Dart state. The requested cycle count appears
+in the saved state and final report.
+
+Windows and Linux must preserve an argument containing spaces, quotes, and
+Unicode. Linux also checks a preflight failure and an accepted request whose
+`execv` fails with an invalid executable. The app must stay alive, the test
+binary must be restored, and a retry must succeed. The runner restores its own
+backup if the check is interrupted.
+
+Each macOS or Windows restart must change PID. An older PID may be reused after
+that process exits. Linux `execv` must retain the PID.
+
+Before cleanup, only the final process may still run the disposable executable.
+Cleanup stops recorded PIDs only after checking their executable identity. An
+unrecorded matching process causes failure and is left alone. Raw boot records
+remain available after validation failures. A passing report requires all
+restart checks and confirmation that no owned process remains after cleanup.
+
+### Windows failure recovery
+
+The native harness injects launch, event, worker, wait, and resume failures. It
+checks resource cleanup and verifies that a later request can recover:
 
 ```sh
 cmake -S windows/tests -B /path/to/native-tests
@@ -110,31 +167,35 @@ cmake --build /path/to/native-tests --config Release
 ctest --test-dir /path/to/native-tests -C Release --output-on-failure
 ```
 
-For the supplemental macOS launch-error check, create a separate consumer named
-`restart_macos_recovery`, use a unique `com.example.restartMacosRecovery` bundle
-identifier suffix, and build `macos_recovery_main.dart` against the extracted
-candidate. Pass the built app to the external controller:
+### macOS launch failure
+
+Create a separate consumer named `restart_macos_recovery` with a unique suffix
+on its `com.example.restartMacosRecovery` bundle identifier. Build
+`macos_recovery_main.dart` against the extracted candidate, then run:
 
 ```sh
 python3 .github/ci/run_macos_recovery.py /path/to/restart_macos_recovery.app \
   --output /tmp/macos-recovery.json --build-provenance /path/to/build-provenance.json
 ```
 
-The controller copies the app to a unique run directory and waits for Dart and
-native-channel readiness. It moves only that copy's executable to a verified
-backup, then commands a restart. The app must return `RESTART_FAILED`, retain its
-PID and Dart memory, and answer a native-channel ping. The controller restores
-identical bytes and permissions before commanding a successful retry, which
-must create a fresh PID and Dart boot and allow the old process to exit. Its
-cleanup also restores the executable after failures and stops only recorded
-processes after checking their executable identity. Each JSON report preserves
-the run, bundle, command sequence, failure, restoration, and cleanup evidence.
+The controller copies the app into a unique directory and waits for Dart and
+native-channel readiness. It moves that copy's executable to a verified backup
+before requesting a restart. The app must return `RESTART_FAILED`, keep its PID
+and Dart state, and answer a native-channel ping.
+
+After restoring identical executable bytes and permissions, the controller
+requests another restart. This must produce a new PID and Dart boot, and the
+old process must exit. Cleanup restores the executable after failures and stops
+only recorded processes whose identity still matches. The report includes the
+bundle, command sequence, failure, restoration, and cleanup records.
 
 ## iOS
 
-Use a candidate archive to prepare a disposable consumer. Run 100 engine
+### Engine lifecycle
+
+Prepare a disposable consumer from the candidate archive. Run 100 engine
 restarts on the current iOS Simulator runtime and 30 on the older runtime,
-with a fresh consumer directory for each:
+using a fresh consumer directory for each:
 
 ```sh
 python3 .github/ci/prepare_ios_stress.py /tmp/candidate.tar.gz /tmp/ios-stress-current \
@@ -143,33 +204,36 @@ python3 .github/ci/run_ios_stress.py /tmp/ios-stress-current \
   --device <simulator-udid> --output /tmp/ios-stress-current.json
 ```
 
-The gate alternates default and explicit engine mode, verifies persisted state
-and a mounted WebView's JavaScript roundtrip on every new boot, and uses
-XCUITest for real Home/resume checkpoints every ten cycles. Process mode must
-be rejected at each checkpoint. The native PID must remain unchanged.
+Requests alternate between default and explicit engine mode. Every new boot
+must read saved state and complete a mounted WebView's JavaScript roundtrip.
+XCUITest performs real Home/resume checkpoints every ten cycles; process mode
+must be rejected at each checkpoint. The native PID must stay the same.
+
 Each WebView scroll must stabilize within 2 seconds and remain at the expected
-offset after the fixed settle interval; both measurements are required.
+offset after the fixed settle interval. The host records weak object lifetimes,
+completed `destroyContext` calls, resident memory, and physical footprint.
+Growth above the larger of 30 MiB or 20%, continuing monotonic block growth, or
+retained replacement objects requires investigation before a pass. The normal
+plugin factory and root installer stay in use. See the
+[iOS stress guide](ios_stress.md) for the measurement windows and full criteria.
 
-The QA host records weak engine/controller/WebView lifetimes and forwards
-`destroyContext` calls to verify completion. The normal plugin factory and
-root installer remain unchanged. It records resident memory and physical
-footprint after a fixed settle interval. Growth above the larger of 30 MiB or
-20%, continuing monotonic block growth, or retained replacement objects
-requires investigation before the gate passes. See the [iOS stress guide](ios_stress.md)
-for comparison windows, instrumentation boundaries, and report details.
+### Native failure paths
 
-Run `RunnerTests` on an iOS simulator through the example's Xcode workspace.
-These tests cover unsupported modes, concurrent engine and notification
-requests, notification failure recovery, foreground scene selection, factory
-failure without destroying the current engine, custom-window unavailability,
-and restoring root-controller protection after reconfiguration.
+Run `RunnerTests` on an iOS Simulator through the example's Xcode workspace.
+The tests cover unsupported modes, concurrent engine and notification requests,
+notification failure recovery, foreground scene selection, factory failure that
+preserves the current engine, custom-window unavailability, and root-controller
+protection after reconfiguration.
 
-Test notification fallback separately. Denied permission must report failure
-without exiting. Accepted fallback exits and requires the user to reopen the
-app through its notification. It is not an automatic process relaunch.
+### Notification fallback
 
-Run the normal candidate example through both real notification-permission paths
-on an English-language iOS Simulator:
+Test notification fallback separately from engine restart. Denied permission
+must return a failure and leave the app running. Accepted fallback schedules a
+notification and exits; the user must reopen the app through the notification.
+It does not relaunch the process automatically.
+
+Run both permission paths with the normal candidate example on an
+English-language iOS Simulator:
 
 ```sh
 python3 .github/ci/run_ios_fallback.py /tmp/candidate.tar.gz /tmp/fallback-denied \
@@ -178,20 +242,25 @@ python3 .github/ci/run_ios_fallback.py /tmp/candidate.tar.gz /tmp/fallback-allow
   --sha256 <archive-sha256> --device <simulator-udid> --policy allowed
 ```
 
-Each command creates a unique disposable bundle identifier with fresh permission
-state. The example's Dart files and Swift lifecycle sources remain unchanged and
-are verified before and after building and running. XCUITest scrolls through the
-actual example checks, records their boot and persistence markers, and handles
-the notification prompt for that specific app. Denial must leave the same app
-process and Dart boot alive; a second denied request must also recover, followed
-by a successful same-process engine restart. Acceptance must terminate the app;
-tapping the delivered notification must reopen it with a different PID and boot.
+Each command creates a unique bundle identifier and fresh permission state.
+The runner verifies that the example's Dart and Swift lifecycle files are
+unchanged before and after the build and run. XCUITest scrolls through the
+example's checks, records boot and persistence markers, and answers the
+notification prompt for that app.
+
+Denial must preserve the process and Dart boot. A second denied request must
+also recover, followed by a successful engine restart in the same process.
+Acceptance must terminate the app. Tapping the delivered notification must
+reopen it with a new PID and Dart boot.
+
 Both paths require all example plugin checks, including the mounted WebView and
-previous-boot file and SQLite markers. The runner preserves build logs, the
-XCTest result bundle, and validated JSON evidence, and stops only its disposable
-app. Use a fresh consumer directory for each run.
+previous-boot file and SQLite markers. The runner saves build logs, the XCTest
+result bundle, and validated JSON, then stops its disposable app. Use a fresh
+consumer directory for each run.
 
 ## Web
+
+### Build and run
 
 Use Node 24 and the current Flutter SDK. From `example/`, build the browser
 probe without service-worker registration:
@@ -200,7 +269,7 @@ probe without service-worker registration:
 flutter build web -t lib/web_restart_probe.dart --pwa-strategy=none
 ```
 
-From `.github/ci/`, install and run the isolated browser tests:
+From `.github/ci/`, install and run the browser tests:
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
@@ -209,9 +278,9 @@ npm run test:web
 ```
 
 On Linux, add `--with-deps` to the browser installation command. The runner
-starts and stops its own local server. JavaScript runs on Chromium and WebKit
-at desktop and mobile viewport sizes. Each scenario runs three times with a
-new context and run ID.
+starts and stops its own local server. JavaScript builds run on Chromium and
+WebKit at desktop and mobile viewport sizes. Each scenario runs three times
+with a fresh context and run ID.
 
 Rebuild the probe with `--wasm --pwa-strategy=none`, then run from `.github/ci/`:
 
@@ -219,57 +288,73 @@ Rebuild the probe with `--wasm --pwa-strategy=none`, then run from `.github/ci/`
 RESTART_WEB_MODE=wasm npm run test:web
 ```
 
-The Wasm suite uses Chromium and requires an actual `main.dart.wasm` response
-without JavaScript fallback. Both suites cover the current route, full and
-relative destinations, changed/removed/empty fragments, identical URLs,
-non-root HTML base URLs, history, rejected modes, invalid-URL recovery,
-opaque sandbox frames, and a tab switch. Opaque frames retain proof state in
-their parent because their own storage is unavailable. The QA build omits
-service-worker registration, which browsers forbid in those frames.
+Wasm runs on Chromium and must receive `main.dart.wasm` without JavaScript
+fallback.
 
-Every accepted restart requires a fresh Dart boot and document time origin,
-saved state, reset memory state, and the exact destination URL. History checks
-distinguish replacement navigation from the hash shorthand's added entry.
-The tab-switch record includes observed visibility; a headless browser may keep
-both tabs visible. Run the separate headed Chromium check to require a hidden
-document before restarting, a new document while still hidden, and a visible
-page on return:
+### Required results
+
+Both builds cover current, full, and relative URLs; changed, removed, and empty
+fragments; identical URLs; non-root HTML base URLs; history; rejected modes;
+invalid-URL recovery; opaque sandbox frames; and tab switches. Opaque frames
+store their records in the parent because their own storage is unavailable.
+The build omits service-worker registration, which browsers forbid in those
+frames.
+
+Every accepted restart must produce a fresh Dart boot and document time origin,
+preserve saved state, reset in-memory state, and reach the exact destination
+URL. History checks distinguish replacement navigation from the new entry
+created by the hash shorthand.
+
+### Background tabs
+
+A headless browser may keep both tabs visible. Run the headed Chromium check to
+require a hidden document before restart, a new document while still hidden,
+and a visible page on return:
 
 ```sh
 RESTART_WEB_HEADED=1 npx playwright test --config playwright.config.mjs \
   --workers 1 --repeat-each 1 --grep 'tab switch'
 ```
 
-On Linux, set the environment variable first and run the `npx` command through
-`xvfb-run -a`. The runner owns a temporary browser profile and disables
-Playwright's default focus emulation through
-`connectOverCDP` with `noDefaults: true`. It does not synthesize visibility
-events. These four checks cover default and full-fragment reloads at desktop
-and narrow widths; narrow headed windows are viewport checks, not physical
-mobile-device evidence. Repeat with `RESTART_WEB_MODE=wasm` for a Wasm build.
-On Linux, the disposable browser uses Chromium's [SwiftShader GL driver](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/gpu/swiftshader.md)
-so WebGL is available without a GPU. The Wasm check still requires an actual
-`main.dart.wasm` response and rejects JavaScript fallback.
+On Linux, set the environment variable first and run `npx` through
+`xvfb-run -a`. The runner uses a temporary browser profile and connects with
+`connectOverCDP` and `noDefaults: true` to avoid Playwright's focus emulation.
+It records real visibility events.
 
-Set `RESTART_WEB_BUILD` to an absolute build directory, `RESTART_WEB_PORT` to
-an unused port, and `RESTART_WEB_RESULTS` to an evidence directory when needed.
-The default results directory is `restart_app_web_results_js` or
-`restart_app_web_results_wasm` in the system temporary directory. Reports include
-browser versions, application responses, restart fields, screenshots, and
-failure traces. `RESTART_PACKAGE_SHA256` records a candidate archive hash in
-the report; verify the consumer's package origin separately before building.
-The CI browser jobs build a copied example against the shared publication
-archive and verify that its package files remain unchanged after execution.
+These four checks cover default and full-fragment reloads at desktop and narrow
+widths. Narrow desktop windows do not establish physical mobile-device behavior.
+Repeat with `RESTART_WEB_MODE=wasm` for a Wasm build. On Linux, the disposable
+browser uses Chromium's
+[SwiftShader GL driver](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/gpu/swiftshader.md)
+so WebGL is available without a GPU. The Wasm check still requires
+`main.dart.wasm` and rejects JavaScript fallback.
 
-For manual checks, serve a build from the repository root:
+### Reports and manual checks
+
+Set these variables when you need non-default paths or ports:
+
+| Variable | Value |
+| --- | --- |
+| `RESTART_WEB_BUILD` | Absolute build directory |
+| `RESTART_WEB_PORT` | Unused local port |
+| `RESTART_WEB_RESULTS` | Evidence directory |
+| `RESTART_PACKAGE_SHA256` | Candidate archive hash to record |
+
+Default reports go to `restart_app_web_results_js` or
+`restart_app_web_results_wasm` in the system temporary directory. They include
+browser versions, app responses, restart records, screenshots, and failure
+traces. Verify the resolved package origin separately before building. CI builds
+a copied example from the shared candidate archive and verifies its package
+files again after execution.
+
+For a manual check, serve a build from the repository root:
 
 ```sh
 python3 .github/ci/serve_web_probe.py example/build/web
 ```
 
-Visit `/deep/start?case=full-hash&run=<unique-id>#existing`. The page lists the
-available scenarios when the `run` parameter is absent. Use a new run ID for
-each attempt.
+Visit `/deep/start?case=full-hash&run=<unique-id>#existing`. Omit `run` to see the
+available scenarios. Use a new run ID for each attempt.
 
 ## Documentation
 
@@ -283,49 +368,52 @@ RESTART_DOCS_SITE=/path/to/prepared/export \
   npx --prefix .github/ci playwright test --config .github/ci/docs_playwright.config.mjs
 ```
 
-Validate, export, and prepare the docs using the Pages workflow commands. The
-browser suite visits every documentation page at desktop and narrow widths in
-both themes. It checks resource failures, visible theme icons, stored appearance,
-search and retry after an index failure, keyboard dismissal and restored focus,
-exact code copying, and mobile navigation. It captures every rendered page for
-visual review. The export uses local controls and a generated search index
-because hosted Mintlify interaction scripts do not run on GitHub Pages.
+Use the [Pages workflow](../workflows/docs-pages.yml) commands to validate,
+export, and prepare the site. The browser suite visits every page at desktop
+and narrow widths in both themes. It checks resources, theme controls and stored
+appearance, search and recovery from an index failure, keyboard dismissal and
+restored focus, exact code copying, and mobile navigation. Screenshots of every
+page support visual review.
 
-README image validation examines SVG labels and raster content, so an HTTP200
-error badge fails. It does not treat changing package metrics as fixed values.
-Inspect the candidate README on GitHub and in a pub.dev-style render as well.
-Use a unique `RESTART_DOCS_RESULTS` directory for each evidence run so earlier
-failure traces and screenshots remain available.
+The export supplies local controls and a generated search index because hosted
+Mintlify interaction scripts do not run on GitHub Pages. README image checks
+inspect SVG labels and raster content, so a broken badge fails even with an
+HTTP 200 response. Changing package metrics are not treated as fixed values.
+Also inspect the README on GitHub and in a pub.dev-style render.
+
+Use a unique `RESTART_DOCS_RESULTS` directory for each run to preserve earlier
+screenshots and failure traces.
 
 ## Release evidence
 
-Create the candidate with the current Dart SDK's package selection after a
-clean publish dry run:
+Create a candidate with the current Dart SDK after a clean publication dry run:
 
 ```sh
 dart pub publish --dry-run
 dart pub publish --to-archive=/tmp/restart_app-candidate.tar.gz
+python3 .github/ci/package_archive.py /tmp/restart_app-candidate.tar.gz \
+  --extract /tmp/restart_app-candidate --manifest /tmp/restart_app-candidate.json
 ```
 
-The second command writes an archive without uploading it. Record its SHA256,
-extract it into a separate directory, and use that directory for release
-consumers. `check_skills.py`, `check_compatibility.py`, and
+The archive command does not upload the package. Record the archive SHA-256
+and canonical payload manifest, then build release consumers from that
+extracted directory. `check_skills.py`, `check_compatibility.py`, and
 `build_android_consumer.py` accept `--package-dir /path/to/extracted-package`.
-They reject Dart or native plugin metadata pointing to another checkout.
-Check a manually prepared consumer before and after building:
+They reject Dart or native plugin metadata that points to another checkout.
+For a manually prepared consumer, check the origin before and after building:
 
 ```sh
 python3 .github/ci/candidate_package.py /path/to/consumer /path/to/extracted-package --platform web
 ```
 
-Keep the QA harness outside the extracted package. Finish the runtime and
-skills checks before publication, then compare the final publication selection
-with the frozen candidate. Changes to packaged files require repeating the
-affected checks. Postpublication verification confirms delivery of the same
-files.
+Keep the verification harness outside the extracted package. Complete runtime
+and skills checks before publication, then compare the final package selection
+with the candidate manifest. Repeat affected checks if packaged files change.
+After publication, verify that consumers receive the same files.
 
-Record the SDK, OS, build mode, app target SDK, packaging, and actual scenarios.
-A simulator run does not establish physical-device or OEM behavior. A desktop
-CI application does not establish signed Store/MSIX behavior, every Linux
-distribution, custom termination delegates, or every host application's plugin
-lifecycle. Test the application and distribution format you ship.
+Record SDK and OS versions, build mode, app target SDK, packaging, and the
+scenarios exercised. Simulator results do not establish physical-device or OEM
+behavior. Desktop CI does not cover every distribution format, Linux
+distribution, custom termination delegate, or host plugin lifecycle. Test the
+app and distribution format you ship, including signed Store or MSIX builds
+where applicable.

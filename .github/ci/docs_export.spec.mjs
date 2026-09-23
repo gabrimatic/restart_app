@@ -1,11 +1,38 @@
 import { test, expect } from '@playwright/test';
 
 const pages = [
-  ['', 'restart_app'], ['quickstart/', 'Quickstart'], ['agent-skills/', 'Agent skills'],
+  ['', 'Flutter app restarts'], ['quickstart/', 'Quickstart'], ['agent-skills/', 'AI agent skills'],
   ['product/platform-behavior/', 'Platform behavior'], ['product/ios-engine-restart/', 'iOS engine restart'],
   ['product/background-isolates/', 'Background isolates'], ['reference/api/', 'API reference'],
   ['reference/configuration/', 'Configuration'], ['reference/linux/', 'Linux'],
 ];
+
+test('advertised documentation indexes and Markdown pages are available', async ({ page, request }) => {
+  for (const [route, heading] of pages) {
+    await page.goto(route || './');
+    const alternatives = await page.locator('link[rel="alternate"]').evaluateAll(links =>
+      links.map(link => ({ type: link.type, href: link.href })));
+    expect(alternatives.map(link => link.type).sort()).toEqual(['application/xml', 'text/markdown']);
+    for (const alternative of alternatives) {
+      const response = await request.get(alternative.href);
+      expect(response.ok(), alternative.href).toBe(true);
+      const body = await response.text();
+      if (alternative.type === 'text/markdown') {
+        expect(body).toContain(heading);
+        expect(body).not.toContain('<!DOCTYPE html>');
+      } else {
+        expect(body).toContain('<urlset');
+        expect(body.match(/<loc>/g)).toHaveLength(pages.length);
+      }
+    }
+    const indexLink = await page.locator('[data-agent-docs-index] a').getAttribute('href');
+    expect(indexLink).toBe('/restart_app/llms.txt');
+    const index = await request.get(indexLink);
+    expect(index.ok()).toBe(true);
+    const indexText = await index.text();
+    for (const [, title] of pages) expect(indexText).toContain(title);
+  }
+});
 
 for (const theme of ['light', 'dark']) {
   test(`theme ${theme}: visible icon, toggle and saved preference`, async ({ page }, info) => {

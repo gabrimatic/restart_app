@@ -4,10 +4,10 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'restart_app'
-  s.version          = '1.10.0'
-  s.summary          = 'A Flutter plugin to restart or relaunch apps with platform-specific behavior.'
+  s.version          = '1.10.1'
+  s.summary          = 'Restart Flutter apps from Dart.'
   s.description      = <<-DESC
-A Flutter plugin that helps restart or relaunch Flutter apps with platform-specific behavior, including opt-in iOS Flutter engine restart.
+Restart a Flutter app on iOS by creating a new engine and registering its plugins through AppDelegate.
                        DESC
   s.homepage         = 'https://github.com/gabrimatic/restart_app'
   s.license          = { :file => '../LICENSE' }

@@ -2,7 +2,7 @@
 
 What does this PR change and why?
 
-## Platform(s) Affected
+## Affected platforms
 
 - [ ] Android
 - [ ] iOS
@@ -10,13 +10,17 @@ What does this PR change and why?
 - [ ] macOS
 - [ ] Web
 - [ ] Windows
+- [ ] Documentation only
 
 ## Testing
 
-How was this tested? List the device/simulator and OS version.
+Describe the checks you ran and their results. For app behavior, include the
+device or simulator, OS version, and build mode. For documentation, check the
+rendered page, links, and examples. See the
+[verification guide](https://github.com/gabrimatic/restart_app/blob/master/.github/ci/verification.md).
 
 ## Checklist
 
-- [ ] `flutter analyze` passes with no issues
-- [ ] Tested on the relevant platform(s)
-- [ ] `CHANGELOG.md` updated if this is a user-facing change
+- [ ] Relevant analysis and tests pass
+- [ ] Changed app behavior verified on the affected platforms
+- [ ] Changelog updated for changes that affect package users

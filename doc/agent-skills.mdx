@@ -1,71 +1,55 @@
 ---
-title: Agent skills
-description: Install versioned restart_app guidance for your coding agent.
+title: AI agent skills
+description: Install bundled restart_app skills for AI coding agents, covering Flutter app restarts, platform behavior, and iOS engine setup.
 ---
 
-`restart_app` 1.9.2 and later bundle two skills with the package. They teach your
-coding agent the package API and platform constraints from the version your app
-actually resolves.
+`restart_app` includes two AI agent skills: instructions and examples that help your coding agent integrate the package. The skills come from the package version installed in your project.
 
-| Skill | Use it for |
+| Skill | Covers |
 | --- | --- |
-| `restart-app-integration` | Restart modes, structured results, saving state, web routes, desktop behavior, background isolates, and verification. |
-| `restart-app-ios-engine-restart` | AppDelegate and UIScene setup, replacement engine registration, custom native shells, and iOS failure handling. |
+| `restart-app-integration` | Restart calls, modes, results, saved data, web routes, desktop apps, and background isolates. |
+| `restart-app-ios-engine-restart` | AppDelegate and UIScene setup, plugin registration, custom Flutter engines, and iOS errors. |
 
 ## Install
 
-From your Flutter project root:
+From your Flutter project, run:
 
-```bash
+```sh
 flutter pub get
 dart run skills@ get restart_app
 ```
 
-Select the skills when prompted. To install both without selecting them:
+Select the skills when prompted. To install both:
 
-```bash
+```sh
 dart run skills@ get restart_app --all
 ```
 
-The CLI detects supported agent configuration and installs the skills there.
-For a generic Agent Skills setup, select the destination explicitly:
+The CLI detects supported coding agents and installs the instructions in their configuration directories. For a generic Agent Skills directory, use:
 
-```bash
+```sh
 dart run skills@ get restart_app --all --agent generic
 ```
 
-This writes to `.agents/skills/` in your project. The iOS skill includes a
-`references/host-setup.md` file with both lifecycle examples; keep that file with
-the skill when moving it manually.
+This installs the files under `.agents/skills/`. The iOS skill includes `references/host-setup.md`; keep it with the skill if you copy the files manually.
 
-The `dart run skills@` syntax requires Dart 3.12 or later. The Skills CLI itself
-supports Dart 3.10 or later. On Dart 3.10 or 3.11, install and run it with:
+## Requirements
 
-```bash
+Skills are included in `restart_app` 1.9.2 and later. The `dart run skills@` command requires Dart 3.12 or later.
+
+With Dart 3.10 or 3.11, use the globally installed CLI:
+
+```sh
 dart pub global activate skills
 dart pub global run skills get restart_app
 ```
 
-These are development tools. Do not add `skills` to your app dependencies or
-raise your app's minimum SDK just to bundle these instructions. The plugin's
-Dart and Flutter minimum versions are unchanged.
+Installing skills does not add a runtime dependency or change your app's minimum Dart or Flutter version. The instructions guide your agent; they do not run inside your app.
 
 ## Updates
 
-After changing the resolved `restart_app` version, run `flutter pub get` and the
-skill installation command again. The CLI reports updated skills. Review the
-installed changes along with the dependency upgrade.
+After upgrading `restart_app`, run `flutter pub get` and install the skills again. The CLI detects changes and updates the instructions to match the resolved package.
 
-The CLI reads the package selected by your dependency resolution, including a
-path dependency during local development. If no skills are found, check that
-`restart_app` is a direct dependency and resolves to 1.9.2 or later. For a custom
-agent setup, pass its supported `--agent` value explicitly.
+If no skills appear, check that `restart_app` is a direct dependency at version 1.9.2 or later. Local path dependencies are supported too.
 
-## Scope
-
-Skills provide instructions to your coding agent. They do not configure your
-AppDelegate automatically, alter runtime restart behavior, or guarantee that a
-restart succeeds. Review generated changes and test on the target platform.
-
-For the packaging convention and CLI details, see Dart's
-[package skills guide](https://dart.dev/tools/pub/package-skills).
+For CLI options and the packaging format, see Dart's [package skills guide](https://dart.dev/tools/pub/package-skills).

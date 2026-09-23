@@ -59,11 +59,8 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
       let url = Bundle.main.bundleURL
       let config = NSWorkspace.OpenConfiguration()
       config.createsNewApplicationInstance = true
-      // NSApp.terminate(nil) goes through the normal AppKit termination
-      // sequence, which may invoke applicationShouldTerminate: on the
-      // app delegate. In sandboxed apps this is expected; unsaved-document
-      // dialogs from other frameworks could appear but are unlikely in a
-      // typical Flutter app.
+      // NSApp.terminate(nil) uses AppKit's termination sequence. The app
+      // delegate can postpone or cancel it, for example to save a document.
       NSWorkspace.shared.openApplication(at: url, configuration: config) { application, error in
         DispatchQueue.main.async {
           if let error = error {

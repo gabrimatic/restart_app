@@ -1,47 +1,19 @@
 ---
 title: Quickstart
-description: Add restart_app to a Flutter project and restart the app from Dart.
+description: Install restart_app and restart your Flutter app with one Dart call. Includes iOS setup links and SDK requirements.
 ---
 
 ## Install
 
-Add the package:
+Requires Flutter 3.22 or later and Dart 3.4 or later.
 
-```yaml
-dependencies:
-  restart_app: ^1.10.0
+```sh
+flutter pub add restart_app
 ```
 
-Then fetch dependencies:
+## Usage
 
-```bash
-flutter pub get
-```
-
-## Requirements
-
-**Dart SDK:** `>=3.4.0` · **Flutter:** `>=3.22.0`
-
-These are the plugin's minimum SDK constraints. Your chosen Flutter release,
-other dependencies, and distribution channel can require newer operating systems
-or build tools. For example, Flutter 3.47 raises its own minimums to Android 24,
-iOS 15, and macOS 12. Use an older compatible Flutter SDK for older deployment
-targets; the plugin's native Android 21, iOS 12, and macOS 10.15 minimums remain
-unchanged. See Flutter's [supported platforms](https://docs.flutter.dev/reference/supported-platforms).
-
-| Platform | Minimum |
-| --- | --- |
-| Android | `minSdk` 21, Java 17, Android Gradle Plugin 8 or 9 |
-| iOS | 12.0 |
-| macOS | 10.15 |
-
-The Android module builds on Android Gradle Plugin 8 and 9. It applies the Kotlin Gradle Plugin only when nothing else has already provided Kotlin, so it builds on both AGP majors with the Flutter template default `android.builtInKotlin=false`. Turning built-in Kotlin on is a separate Flutter migration that needs Flutter 3.47 or later; on earlier Flutter releases it fails for every plugin, including Flutter's own plugin template.
-
-## Restart the app
-
-On iOS, complete the [host setup](/product/ios-engine-restart/) first. The default call cannot restart an unconfigured iOS app.
-
-Persist required state and await pending writes before restarting. Import the package, then call it from an async app action on the main isolate:
+Import the package and call `Restart.restartApp()` from a button or another app action:
 
 ```dart
 import 'package:restart_app/restart_app.dart';
@@ -49,40 +21,41 @@ import 'package:restart_app/restart_app.dart';
 await Restart.restartApp();
 ```
 
-For production flows, keep the returned result and handle failures:
+**iOS:** follow the [AppDelegate setup](/product/ios-engine-restart/) before calling this method. It registers your plugins with the replacement Flutter engine.
+
+The default call chooses the restart behavior for the platform. On web, it reloads the whole Flutter app at the same browser URL. See [platform behavior](/product/platform-behavior/) for all six platforms.
+
+## Error handling
+
+To handle a rejected restart request, read the returned `RestartResult`:
 
 ```dart
+import 'package:flutter/foundation.dart';
+import 'package:restart_app/restart_app.dart';
+
 final result = await Restart.restartApp();
 
 if (!result.success) {
-  // Show or log result.code and result.message.
+  debugPrint('Restart failed: ${result.code}: ${result.message}');
 }
 ```
 
-`Restart.restartApp()` returns a `RestartResult` with `success`, the resolved `mode`, and platform error details when the restart cannot be started.
+A successful result means the platform accepted the request. Restarting can stop the calling Dart code, so complete any work that must finish before the call. If your app has unsaved edits, save them through your usual storage code first. A restart does not erase preferences, files, or databases.
 
-## Customize behavior
+## Options
 
-Use the default mode after completing the setup for your platform. Pass options only when your app needs a specific platform behavior.
+For a different behavior, such as an Android process restart or a web restart at a particular route, see [configuration](/reference/configuration/). The [API reference](/reference/api/) lists every parameter, result field, and capability.
 
-```dart
-await Restart.restartApp(
-  mode: RestartMode.platformDefault,
-  webOrigin: '#/home',
-  forceKill: false,
-  notificationTitle: 'Restart',
-  notificationBody: 'Tap to reopen the app.',
-);
-```
+## Requirements
 
-## Check capabilities
+| Component | Minimum |
+| --- | --- |
+| Flutter | 3.22 |
+| Dart | 3.4 |
+| Android | API 21, Java 17, Android Gradle Plugin 8.1.4, Kotlin 2.0.21 |
+| iOS | 12.0 |
+| macOS | 10.15 |
 
-Use `Restart.restartCapability()` when your UI should adapt to the current platform.
+Your Flutter SDK and other dependencies may require newer OS versions. For example, Flutter 3.47 requires Android 24, iOS 15, and macOS 12. Older deployment targets need a Flutter SDK that still supports them. See Flutter's [supported platforms](https://docs.flutter.dev/reference/supported-platforms).
 
-```dart
-final capability = await Restart.restartCapability();
-
-if (capability.flutterEngineRestart) {
-  await Restart.restartApp(mode: RestartMode.flutterEngine);
-}
-```
+The Android plugin supports AGP 8 and 9, including projects with `android.builtInKotlin=false`. Enabling AGP's built-in Kotlin requires Flutter 3.47 or later. Keep your existing setting unless you are [migrating to built-in Kotlin](https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin).

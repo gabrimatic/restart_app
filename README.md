@@ -6,87 +6,82 @@ Restart your Flutter app from Dart on Android, iOS, web, macOS, Linux, and Windo
 
 [Documentation](https://gabrimatic.github.io/restart_app/) · [API reference](https://gabrimatic.github.io/restart_app/reference/api/) · [Example](https://github.com/gabrimatic/restart_app/tree/master/example)
 
+## Features
+
+- App and process restarts on Android and desktop.
+- Flutter engine restarts on iOS, with native setup.
+- Flutter web app restarts with JavaScript and WebAssembly support.
+- Restart results, error details, and platform capability checks.
+- Bundled AI agent skills for integration and iOS configuration.
+
 ## Quick start
 
-Requires **Flutter 3.22+** and **Dart 3.4+**. Add the dependency:
+Requires Flutter 3.22 or later and Dart 3.4 or later.
 
-```yaml
-dependencies:
-  restart_app: ^1.10.0
+```sh
+flutter pub add restart_app
 ```
 
-On iOS, complete the [host setup](#ios-setup) before your first restart. Save any state you need to keep and await pending writes, then call from an async action on the main isolate:
+Import the package and call it from a button or another app action:
 
 ```dart
 import 'package:restart_app/restart_app.dart';
 
-final result = await Restart.restartApp();
-
-if (!result.success) {
-  // Handle result.code and result.message.
-}
+await Restart.restartApp();
 ```
 
-`RestartResult` reports whether the restart request was accepted, the resolved `mode`, and any error details. The running Dart code may stop before the future completes.
+**iOS:** complete the [AppDelegate setup](https://gabrimatic.github.io/restart_app/product/ios-engine-restart/) before using this call.
 
-## Platform behavior
+The method returns a `RestartResult` with success or error details. See [error handling](https://gabrimatic.github.io/restart_app/quickstart/#error-handling) for an example.
 
-The default mode uses the restart mechanism available on each platform:
+## Platforms
 
-| Platform | Default behavior |
-|----------|------------------|
-| Android | Relaunches the main activity. Use `RestartMode.process` for a new process. Android TV and Fire TV launcher entries are supported. |
-| iOS | Creates a new Flutter engine and widget tree in the same process. Requires [host setup](#ios-setup); native global and singleton state remain alive. |
-| Web | Reloads the current page, preserving its URL and route. |
-| macOS | Launches a new app instance and requests termination of the current one. |
-| Linux | Replaces the current process image with the app executable. The PID can remain unchanged. |
-| Windows | Launches a new process and terminates the current one. |
+`Restart.restartApp()` uses the following default behavior:
 
-See the [platform guide](https://gabrimatic.github.io/restart_app/product/platform-behavior/) for supported modes, lifecycle requirements, and packaging limits.
+| Platform | What happens |
+| --- | --- |
+| Android | Relaunches the app's main activity. Use `RestartMode.process` to also restart the process. Android TV and Fire TV are supported. |
+| iOS | Recreates the Flutter engine and starts the Flutter app again within the existing iOS process. Requires the setup below. |
+| Web | Reloads the whole Flutter web app at the same URL. |
+| macOS | Opens a new app instance and asks the existing instance to quit. |
+| Linux | Runs the app executable again, replacing the existing process without changing its process ID. |
+| Windows | Opens a new app process and ends the existing process. |
 
-## iOS setup
+### iOS setup
 
-The app must register its plugins on each replacement Flutter engine.
+Add the plugin registration callback to `ios/Runner/AppDelegate.swift` so the new Flutter engine can use your app's plugins. The [iOS guide](https://gabrimatic.github.io/restart_app/product/ios-engine-restart/) has complete examples for UIScene and older AppDelegate projects.
 
-In `ios/Runner/AppDelegate.swift`, add `import restart_app`. Inside your existing `application(_:didFinishLaunchingWithOptions:)`, add this callback before the call to `super.application`:
+iOS restarts the Flutter engine, not the entire native process. Native singletons remain in memory. The optional notification fallback closes the app and requires a notification tap to reopen it.
 
-```swift
-RestartAppPlugin.configureEngineRestart { engine in
-  GeneratedPluginRegistrant.register(with: engine)
-}
+### Web routes
+
+A restart reloads the whole Flutter web app. The browser URL stays the same, so an app opened at `/settings` restarts at `/settings`, where your router decides what to show.
+
+To restart at another route, pass `webOrigin`:
+
+```dart
+await Restart.restartApp(webOrigin: '/');
 ```
 
-Keep your existing initial plugin registration. UIScene apps register their initial engine in `didInitializeImplicitFlutterEngine`; classic apps register it in `application(_:didFinishLaunchingWithOptions:)`.
+Here, `/` is the website root. Apps hosted in a subdirectory should use that path, such as `/my-app/`. Hash routing is also supported with values such as `#/home`. See [web destinations](https://gabrimatic.github.io/restart_app/reference/api/#web-destinations).
 
-The [iOS guide](https://gabrimatic.github.io/restart_app/product/ios-engine-restart/) includes complete examples for both lifecycles, scene migration, and custom windows. Apps built with Xcode 27 require the UIScene lifecycle. Request an engine restart while the app is active.
+## AI agent skills
 
-Without this setup, the default restart returns a failed result. iOS does not support automatic full process restart. The optional `RestartMode.notificationFallback` exits the app and requires notification permission and a user tap to reopen it.
-
-## Configuration
-
-Use `RestartMode.platformDefault` for the behavior above, or select a supported `mode` explicitly. Other options control web destinations, Android process termination, and iOS fallback notification text.
-
-- [Configuration](https://gabrimatic.github.io/restart_app/reference/configuration/): options and defaults.
-- [API reference](https://gabrimatic.github.io/restart_app/reference/api/): results, capabilities, errors, and web URL behavior.
-- [Linux arguments](https://gabrimatic.github.io/restart_app/reference/linux/): preserve command-line arguments across restarts.
-- [Background isolates](https://gabrimatic.github.io/restart_app/product/background-isolates/): coordinate worker requests and saved state through the main isolate.
-
-## Requirements
-
-The plugin's native minimums are Android 21, iOS 12, and macOS 10.15. Android builds require Java 17 and Android Gradle Plugin 8 or 9.
-
-Your Flutter SDK and other dependencies can require newer operating systems and build tools. See the [requirements guide](https://gabrimatic.github.io/restart_app/quickstart/#requirements) for SDK compatibility and Android build configuration.
-
-## Agent skills
-
-The package includes optional skills for restart integration and iOS engine setup. With Dart 3.12 or later, run from your Flutter project:
+The package includes two skills that help AI coding agents use the restart API and configure iOS engine restarts. Install them from your Flutter project with Dart 3.12 or later:
 
 ```sh
-flutter pub get
 dart run skills@ get restart_app
 ```
 
-Select the skills when prompted, or append `--all` to install both. Run the command again after upgrading the package. See the [agent skills guide](https://gabrimatic.github.io/restart_app/agent-skills/) for requirements and installation details.
+Select the skills when prompted. Run the command again after upgrading the package to update your agent's instructions. See the [agent skills guide](https://gabrimatic.github.io/restart_app/agent-skills/) for other installation options.
+
+## Documentation
+
+- [Requirements](https://gabrimatic.github.io/restart_app/quickstart/#requirements): Flutter, native OS, and build tool versions.
+- [Platform behavior](https://gabrimatic.github.io/restart_app/product/platform-behavior/): restart modes and platform limits.
+- [Configuration](https://gabrimatic.github.io/restart_app/reference/configuration/): saved data, web routes, and restart options.
+- [Background isolates](https://gabrimatic.github.io/restart_app/product/background-isolates/): request a restart from a worker.
+- [Linux arguments](https://gabrimatic.github.io/restart_app/reference/linux/): keep command-line arguments after a restart.
 
 ## Author
 
