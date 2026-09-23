@@ -244,6 +244,9 @@ Playwright's default focus emulation through
 events. These four checks cover default and full-fragment reloads at desktop
 and narrow widths; narrow headed windows are viewport checks, not physical
 mobile-device evidence. Repeat with `RESTART_WEB_MODE=wasm` for a Wasm build.
+On Linux, the disposable browser uses Chromium's [SwiftShader GL driver](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/gpu/swiftshader.md)
+so WebGL is available without a GPU. The Wasm check still requires an actual
+`main.dart.wasm` response and rejects JavaScript fallback.
 
 Set `RESTART_WEB_BUILD` to an absolute build directory, `RESTART_WEB_PORT` to
 an unused port, and `RESTART_WEB_RESULTS` to an evidence directory when needed.

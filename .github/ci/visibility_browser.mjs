@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { platform, tmpdir } from 'node:os';
 import path from 'node:path';
 
 const delay = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -12,6 +12,9 @@ export async function launchVisibilityBrowser() {
   const process = spawn(chromium.executablePath(), [
     `--user-data-dir=${profile}`, '--remote-debugging-port=0',
     '--no-first-run', '--no-default-browser-check', '--disable-component-update',
+    // Xvfb has no GPU. Use Chromium's software GL driver so Flutter can
+    // exercise Wasm instead of selecting its JavaScript/Canvas2D fallback.
+    ...(platform() === 'linux' ? ['--use-gl=angle', '--use-angle=swiftshader'] : []),
     '--no-sandbox', 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   let stderr = '';
