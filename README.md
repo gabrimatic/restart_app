@@ -2,358 +2,91 @@
 
 [![pub package](https://img.shields.io/pub/v/restart_app.svg)](https://pub.dev/packages/restart_app) [![likes](https://img.shields.io/pub/likes/restart_app)](https://pub.dev/packages/restart_app/score) [![pub points](https://img.shields.io/pub/points/restart_app)](https://pub.dev/packages/restart_app/score)
 
-Restart or relaunch your Flutter app from Dart with one call.
+Restart your Flutter app from Dart on Android, iOS, web, macOS, Linux, and Windows.
 
-The plugin uses platform-specific restart or reload behavior. See the [published docs](https://gabrimatic.github.io/restart_app/) for guides, reference, and deployment details. The [platform behavior guide](https://gabrimatic.github.io/restart_app/product/platform-behavior/) covers the exact native mechanism on each target.
+[Documentation](https://gabrimatic.github.io/restart_app/) · [API reference](https://gabrimatic.github.io/restart_app/reference/api/) · [Example](https://github.com/gabrimatic/restart_app/tree/master/example)
 
 ## Quick start
 
-Add the dependency:
+Requires **Flutter 3.22+** and **Dart 3.4+**. Add the dependency:
 
 ```yaml
 dependencies:
   restart_app: ^1.10.0
 ```
 
-On iOS, complete the [host setup](#configure-flutter-engine-restart) first. The default call cannot restart an unconfigured iOS app.
-
-Persist required state and await pending writes before restarting. Import the package, then call it from an async app action on the main isolate:
+On iOS, complete the [host setup](#ios-setup) before your first restart. Save any state you need to keep and await pending writes, then call from an async action on the main isolate:
 
 ```dart
 import 'package:restart_app/restart_app.dart';
 
-await Restart.restartApp();
-```
-
-If you need to handle errors:
-
-```dart
 final result = await Restart.restartApp();
 
 if (!result.success) {
-  // Show or log result.code and result.message.
+  // Handle result.code and result.message.
 }
 ```
 
-`Restart.restartApp()` is the restart API. It returns a `RestartResult` with `success`, the resolved `mode`, and platform error details when the restart cannot be started.
+`RestartResult` reports whether the restart request was accepted, the resolved `mode`, and any error details. The running Dart code may stop before the future completes.
+
+## Platform behavior
+
+The default mode uses the restart mechanism available on each platform:
+
+| Platform | Default behavior |
+|----------|------------------|
+| Android | Relaunches the main activity. Use `RestartMode.process` for a new process. Android TV and Fire TV launcher entries are supported. |
+| iOS | Creates a new Flutter engine and widget tree in the same process. Requires [host setup](#ios-setup); native global and singleton state remain alive. |
+| Web | Reloads the current page, preserving its URL and route. |
+| macOS | Launches a new app instance and requests termination of the current one. |
+| Linux | Replaces the current process image with the app executable. The PID can remain unchanged. |
+| Windows | Launches a new process and terminates the current one. |
+
+See the [platform guide](https://gabrimatic.github.io/restart_app/product/platform-behavior/) for supported modes, lifecycle requirements, and packaging limits.
+
+## iOS setup
+
+The app must register its plugins on each replacement Flutter engine.
+
+In `ios/Runner/AppDelegate.swift`, add `import restart_app`. Inside your existing `application(_:didFinishLaunchingWithOptions:)`, add this callback before the call to `super.application`:
+
+```swift
+RestartAppPlugin.configureEngineRestart { engine in
+  GeneratedPluginRegistrant.register(with: engine)
+}
+```
+
+Keep your existing initial plugin registration. UIScene apps register their initial engine in `didInitializeImplicitFlutterEngine`; classic apps register it in `application(_:didFinishLaunchingWithOptions:)`.
+
+The [iOS guide](https://gabrimatic.github.io/restart_app/product/ios-engine-restart/) includes complete examples for both lifecycles, scene migration, and custom windows. Apps built with Xcode 27 require the UIScene lifecycle. Request an engine restart while the app is active.
+
+Without this setup, the default restart returns a failed result. iOS does not support automatic full process restart. The optional `RestartMode.notificationFallback` exits the app and requires notification permission and a user tap to reopen it.
+
+## Configuration
+
+Use `RestartMode.platformDefault` for the behavior above, or select a supported `mode` explicitly. Other options control web destinations, Android process termination, and iOS fallback notification text.
+
+- [Configuration](https://gabrimatic.github.io/restart_app/reference/configuration/): options and defaults.
+- [API reference](https://gabrimatic.github.io/restart_app/reference/api/): results, capabilities, errors, and web URL behavior.
+- [Linux arguments](https://gabrimatic.github.io/restart_app/reference/linux/): preserve command-line arguments across restarts.
+- [Background isolates](https://gabrimatic.github.io/restart_app/product/background-isolates/): coordinate worker requests and saved state through the main isolate.
+
+## Requirements
+
+The plugin's native minimums are Android 21, iOS 12, and macOS 10.15. Android builds require Java 17 and Android Gradle Plugin 8 or 9.
+
+Your Flutter SDK and other dependencies can require newer operating systems and build tools. See the [requirements guide](https://gabrimatic.github.io/restart_app/quickstart/#requirements) for SDK compatibility and Android build configuration.
 
 ## Agent skills
 
-This package includes agent skills for restart integration and iOS engine setup.
-Install them from your Flutter project with Dart 3.12 or later after fetching dependencies:
+The package includes optional skills for restart integration and iOS engine setup. With Dart 3.12 or later, run from your Flutter project:
 
-```bash
+```sh
 flutter pub get
 dart run skills@ get restart_app
 ```
 
-Select the skills when prompted, or append `--all` to install both. Run the
-command again after upgrading `restart_app` to update the instructions alongside
-your resolved package version. The CLI is a development tool, not an app dependency.
-
-See the [agent skills guide](https://gabrimatic.github.io/restart_app/agent-skills/)
-for requirements, supported workflows, and installation details.
-
-## Customization
-
-Use the default mode after completing the setup for your platform. Pass options only when your app needs a specific platform behavior.
-
-```dart
-await Restart.restartApp(
-  mode: RestartMode.platformDefault,
-  webOrigin: '#/home',
-  forceKill: false,
-  notificationTitle: 'Restart',
-  notificationBody: 'Tap to reopen the app.',
-);
-```
-
-## Parameters
-
-| Parameter | Platform | Description |
-|-----------|----------|-------------|
-| `mode` | All | Requested restart behavior: `platformDefault`, `flutterEngine`, `process`, or `notificationFallback`. |
-| `webOrigin` | Web | Optional reload or navigation target. See [Web destinations](#web-destinations). |
-| `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Restart`. |
-| `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Tap to reopen the app.` |
-| `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |
-
-### Web destinations
-
-* Null or empty `webOrigin` reloads the current URL and keeps its route.
-* A hash-only value such as `#/home` updates the hash and reloads. Changing the hash adds a history entry.
-* A full or relative URL targeting the same document replaces the current history entry and reloads, including identical URLs and fragment removal. Other destinations use location replacement. Relative URLs resolve against `document.baseURI`, including an HTML `base` element.
-
-## Platform behavior
-
-| Platform | Mechanism | Limitations |
-|----------|-----------|-------------|
-| **Android** | Relaunches the main activity via `PackageManager`. Supports Android TV and Fire TV via leanback launcher fallback. `RestartMode.process` and `forceKill: true` kill the process after launch for a clean cold start. | Requires an attached activity and a launchable app entry point. A default restart does not guarantee a new native process. |
-| **iOS** | Recommended: opt-in Flutter engine restart that creates a new `FlutterEngine`, runs Dart again, re-registers plugins, and replaces the root `FlutterViewController` in the same iOS process. Legacy: local notification + `exit(0)` + user tap. | iOS has no public API for automatic full process restart. Engine restart is not a process restart and cannot reset native singleton state. Legacy fallback requires notification permission and user action. |
-| **Web** | Reloads the page using `window.location`. | Persist state first. The browser and host routing determine navigation and reload behavior. |
-| **macOS** | Launches a new instance via `NSWorkspace` and terminates the current process. | Test the signed distribution you ship, including sandbox and termination delegates. Launch failures return `RESTART_FAILED`; a host termination veto can leave the old instance running. |
-| **Linux** | Replaces the current process via `execv`. | The executable must remain accessible. The PID can stay the same because `execv` replaces the process image. Configure argv preservation if needed. |
-| **Windows** | Launches a new instance via `CreateProcess` and terminates the current process. | Uses the desktop process-launch path, not package activation APIs. Test MSIX/Store packaging separately; launch restrictions return `RESTART_FAILED`. |
-
-## iOS
-
-iOS does not provide a public API for an app to terminate itself and automatically launch a fresh process of the same app. Android-style full process restart is not available on iOS with public APIs.
-
-`restart_app` supports two iOS behaviors:
-
-1. **Flutter engine restart**, recommended. This keeps the iOS process alive, creates a new `FlutterEngine`, runs the Dart entrypoint again, re-registers plugins through the host app's `GeneratedPluginRegistrant`, creates a new `FlutterViewController`, replaces the active root view controller, and destroys the old engine context.
-2. **Notification fallback**, legacy and explicit only. This schedules a local notification, calls `exit(0)`, and requires the user to tap the notification to reopen the app. This is not a true restart and is not recommended as normal product behavior.
-
-### Configure Flutter engine restart
-
-The host app owns `GeneratedPluginRegistrant`, so iOS engine restart requires one app-side setup step.
-
-Choose the snippet that matches your iOS lifecycle.
-
-#### Flutter 3.41+ UIScene apps
-
-Use this shape when your app has migrated to Flutter's UIScene lifecycle and your delegate already looks like `@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate`.
-
-Keep the normal plugin registration for the implicit app engine in `didInitializeImplicitFlutterEngine`. Add `RestartAppPlugin.configureEngineRestart` in `application(_:didFinishLaunchingWithOptions:)` so `restart_app` can register plugins on each newly created engine:
-
-```swift
-import UIKit
-import Flutter
-import restart_app
-
-@main
-@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    RestartAppPlugin.configureEngineRestart { engine in
-      GeneratedPluginRegistrant.register(with: engine)
-    }
-
-    return super.application(
-      application,
-      didFinishLaunchingWithOptions: launchOptions
-    )
-  }
-
-  func didInitializeImplicitFlutterEngine(
-    _ engineBridge: FlutterImplicitEngineBridge
-  ) {
-    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-  }
-}
-```
-
-This follows Flutter's UIScene migration model: the initial engine is registered through `didInitializeImplicitFlutterEngine`, and restarted engines are registered through the `restart_app` callback above.
-
-`restart_app` selects a visible window from a foreground-active `UIWindowScene` and replaces its root `FlutterViewController`, preferring the key window. It rejects automatic selection when no active scene is available. Request restarts while the app is active. If your app has multiple scenes or a custom native shell, pass a `windowProvider` or `viewControllerInstaller` to `configureEngineRestart` so the plugin targets the correct window. A custom `windowProvider` returning `nil` fails with `IOS_NO_ACTIVE_WINDOW`; it does not fall back to another scene. Reconfiguring without a custom installer restores the default root replacement and safety checks.
-
-Complete Flutter's [UIScene migration](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate), including `UIApplicationSceneManifest` in `Info.plist`. Xcode 27 requires the scene lifecycle; the restart callback alone does not migrate the app.
-
-If you implement your own `SceneDelegate`, keep Flutter's scene lifecycle wiring there too: subclass `FlutterSceneDelegate` or conform to `FlutterSceneLifeCycleProvider`, as described in Flutter's [UISceneDelegate migration guide](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate).
-
-#### Classic AppDelegate apps
-
-Use this shape only with older toolchains where your app still registers plugins from `application(_:didFinishLaunchingWithOptions:)`. Apps built with Xcode 27 must migrate to UIScene before they can launch.
-
-In `ios/Runner/AppDelegate.swift`:
-
-```swift
-import UIKit
-import Flutter
-import restart_app
-
-@main
-@objc class AppDelegate: FlutterAppDelegate {
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    RestartAppPlugin.configureEngineRestart { engine in
-      GeneratedPluginRegistrant.register(with: engine)
-    }
-
-    GeneratedPluginRegistrant.register(with: self)
-
-    return super.application(
-      application,
-      didFinishLaunchingWithOptions: launchOptions
-    )
-  }
-}
-```
-
-Then call:
-
-```dart
-final result = await Restart.restartApp();
-```
-
-`RestartMode.platformDefault` uses Flutter engine restart on iOS when this setup is present.
-If this setup is missing, `platformDefault` fails cleanly on iOS instead of falling back to notification + `exit(0)`.
-
-To request the engine path explicitly:
-
-```dart
-final result = await Restart.restartApp(
-  mode: RestartMode.flutterEngine,
-);
-```
-
-### iOS capabilities
-
-```dart
-final capability = await Restart.restartCapability();
-
-if (capability.flutterEngineRestart) {
-  await Restart.restartApp(mode: RestartMode.flutterEngine);
-}
-```
-
-### What iOS engine restart resets
-
-It resets:
-
-- Dart root isolate
-- Flutter widget tree
-- Flutter engine-owned platform channels
-- Flutter plugin registrations for the new engine
-- Platform-view factory registrations for the new engine
-
-It does not reset:
-
-- The iOS process
-- Swift, Objective-C, C, or C++ static/global state
-- Native singleton state
-- Native resources retained by plugins
-- Unrelated Flutter engines or background isolates
-- Native app launch lifecycle callbacks from a real process launch
-
-For code-push systems and plugins with heavy native state, verify behavior in a real release build. Same-process engine restart is not equivalent to full process restart.
-
-### Legacy notification fallback
-
-Use the notification fallback only when the tradeoff is acceptable:
-
-```dart
-Restart.restartApp(
-  mode: RestartMode.notificationFallback,
-  notificationTitle: 'Update applied',
-  notificationBody: 'Tap to reopen the app.',
-);
-```
-
-The plugin requests notification permission at the moment of restart. If not already granted, iOS shows the system prompt right before exit, which feels abrupt.
-
-Request permission earlier in your app's lifecycle. The [permission_handler](https://pub.dev/packages/permission_handler) package works well for this.
-
-If notification permission has been denied, `restartApp()` returns a failed result.
-
-### Provisioning profiles
-
-`restart_app` uses **local notifications only**, not push notifications. It adds no push-related entitlements to your app.
-
-If you see `"requires a provisioning profile with the Push Notifications feature"` when exporting an IPA, another dependency is the cause (commonly `firebase_messaging`). Add the Push Notifications capability to your distribution provisioning profile.
-
-## Linux
-
-### Command-line arguments
-
-By default, the restarted process launches without the original command-line arguments. To preserve them, add the header and call below to your existing `linux/runner/main.cc` (`linux/main.cc` in older Flutter projects). Keep the rest of `main()` unchanged:
-
-```cpp
-#include <restart_app/restart_app_plugin.h>
-
-int main(int argc, char** argv) {
-  restart_app_plugin_store_argv(argc, argv);
-  // ... rest of main()
-}
-```
-
-Flutter's generated plugin rules link the runner to `restart_app_plugin`. If your runner has custom plugin wiring, ensure that link exists in `linux/CMakeLists.txt`, after `include(flutter/generated_plugins.cmake)`:
-
-```cmake
-target_link_libraries(${BINARY_NAME} PRIVATE restart_app_plugin)
-```
-
-Most Flutter apps don't rely on command-line arguments, so this step is optional.
-
-## Background isolates
-
-Route restart requests through the **main isolate**, where the app can save state and coordinate its lifecycle. `Restart.restartApp()` uses a platform channel. Calling it from a background isolate whose binary messenger has not been initialized throws:
-
-```
-Bad state: The BackgroundIsolateBinaryMessenger.instance value is invalid
-until BackgroundIsolateBinaryMessenger.ensureInitialized is executed.
-```
-
-Initializing a background messenger makes platform channels available, but does not coordinate a restart with the UI or pending writes. Send a message to the main isolate.
-
-Call this function from an async app action while the app is active. Supply your persistence function and an error callback. A save failure prevents the restart; worker errors, early exit, and a one-minute timeout also report a failure. Close the port and stop the worker when the operation ends:
-
-```dart
-import 'dart:isolate';
-
-import 'package:restart_app/restart_app.dart';
-
-Future<void> runWorkerAndRestart({
-  required Future<void> Function() savePendingChanges,
-  required void Function(String message) reportFailure,
-}) async {
-  final requests = ReceivePort();
-  Isolate? worker;
-  try {
-    worker = await Isolate.spawn(
-      workerMain,
-      requests.sendPort,
-      onError: requests.sendPort,
-      onExit: requests.sendPort,
-    );
-    final message = await requests.first.timeout(const Duration(minutes: 1));
-    if (message != 'restart') {
-      throw StateError('Worker stopped without a restart request: $message');
-    }
-
-    await savePendingChanges();
-    final result = await Restart.restartApp();
-    if (!result.success) {
-      reportFailure(result.message ?? result.code ?? 'Restart could not start.');
-    }
-  } catch (error) {
-    reportFailure('Restart flow failed: $error');
-  } finally {
-    requests.close();
-    worker?.kill(priority: Isolate.immediate);
-  }
-}
-
-void workerMain(SendPort mainPort) {
-  // Finish this worker's work before sending the request.
-  mainPort.send('restart');
-}
-```
-
-If the error callback updates a widget, check that it is still mounted. Keep the restart action disabled until this function completes.
-
-## Requirements
-
-**Dart SDK:** `>=3.4.0` · **Flutter:** `>=3.22.0`
-
-These are the plugin's minimum SDK constraints. Your chosen Flutter release,
-other dependencies, and distribution channel can require newer operating systems
-or build tools. For example, Flutter 3.47 raises its own minimums to Android 24,
-iOS 15, and macOS 12. Use an older compatible Flutter SDK for older deployment
-targets; the plugin's native Android 21, iOS 12, and macOS 10.15 minimums remain
-unchanged. See Flutter's [supported platforms](https://docs.flutter.dev/reference/supported-platforms).
-
-| Platform | Minimum |
-|----------|---------|
-| Android | `minSdk` 21, Java 17, Android Gradle Plugin 8 or 9 |
-| iOS | 12.0 |
-| macOS | 10.15 |
-
-The Android module builds on Android Gradle Plugin 8 and 9. It applies the Kotlin Gradle Plugin only when nothing else has already provided Kotlin, so it builds on both AGP majors with the Flutter template default `android.builtInKotlin=false`. Turning built-in Kotlin on is a separate Flutter migration that needs Flutter 3.47 or later; on earlier Flutter releases it fails for every plugin, including Flutter's own plugin template.
+Select the skills when prompted, or append `--all` to install both. Run the command again after upgrading the package. See the [agent skills guide](https://gabrimatic.github.io/restart_app/agent-skills/) for requirements and installation details.
 
 ## Author
 

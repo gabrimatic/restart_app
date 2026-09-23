@@ -90,7 +90,7 @@ blocks as standalone libraries. Keep those examples complete and compilable.
 
 ## Runtime verification
 
-Follow the [restart verification guide](.github/ci/README.md) for repeatable
+Follow the [restart verification guide](.github/ci/verification.md) for repeatable
 Android, iOS, desktop, and browser checks. Save state before each restart and
 require a fresh boot marker afterward. A green build or mocked channel test is
 not evidence that the native application relaunched.

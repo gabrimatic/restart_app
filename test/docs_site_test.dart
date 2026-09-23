@@ -36,7 +36,6 @@ void main() {
 
   test('iOS docs explain UIScene integration', () {
     final docs = {
-      'README.md': File('README.md').readAsStringSync(),
       'doc/product/ios-engine-restart.mdx':
           File('doc/product/ios-engine-restart.mdx').readAsStringSync(),
     };

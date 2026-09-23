@@ -3,7 +3,8 @@
 * Reload the web document when an absolute or relative restart URL changes only its fragment, including identical URLs and fragment removal
 * Preserve replacement history and HTML base URL resolution for web restart destinations
 * Require a mounted WebView JavaScript handshake and previous-boot file and SQLite data in the example's restart checks
-* Put iOS host configuration and awaited state persistence beside the first restart examples; provide complete background-isolate coordination with cleanup and failure handling
+* Simplify the README around installation, usage, and required iOS setup; link detailed platform and configuration guides
+* Document awaited state persistence and complete background-isolate coordination with cleanup and failure handling
 * Correct Linux runner paths and distinguish standard plugin linking from custom-runner setup
 * Remove the retired popularity badge, correct the funding image's accessible label, and verify image content as well as transport status
 * Fix quoted HTML and CSS resource paths and uppercase or invalid numeric entities in the static documentation export

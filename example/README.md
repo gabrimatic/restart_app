@@ -36,8 +36,8 @@ A failed state write prevents restart, displays the error, and restores the
 controls. A failed restart also restores the controls and clears the deliberate
 Dart-only test state so another attempt can be made.
 
-See the root [README](../README.md#ios) for the host setup matching your app.
+See the root [README](../README.md#ios-setup) for the host setup matching your app.
 
 The separate `lib/web_restart_probe.dart` entrypoint verifies actual browser
-reloads and destinations. See the [runtime verification guide](https://github.com/gabrimatic/restart_app/blob/master/.github/ci/README.md)
+reloads and destinations. See the [runtime verification guide](https://github.com/gabrimatic/restart_app/blob/master/.github/ci/verification.md)
 for JavaScript and WebAssembly commands and the complete platform checks.
