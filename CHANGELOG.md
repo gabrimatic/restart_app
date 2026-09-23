@@ -7,11 +7,11 @@
 * Correct Linux runner paths and distinguish standard plugin linking from custom-runner setup
 * Remove the retired popularity badge, correct the funding image's accessible label, and verify image content as well as transport status
 * Fix quoted HTML and CSS resource paths and uppercase or invalid numeric entities in the static documentation export
-* Restore the documentation theme icon, use the configured blue palette in both themes, and check all exported pages and interactive controls in desktop and mobile browsers
+* Restore the documentation theme icon, use the configured blue palette in both themes, and check all exported pages and interactive controls at desktop and mobile viewport sizes
 * Include package ignore rules and dependency lockfile changes in CI; restrict documentation deployment to the master branch
 * Add candidate-package origin checks so release consumers and installed skills can be verified against the exact packaged files
 * Add sustained native restart checks with lifecycle transitions, Android activity recreation, iOS engine and view lifetime checks, and desktop process cleanup
-* Exercise repeated JavaScript and WebAssembly restarts across URL forms, browser history, background tabs, and opaque-origin frames with parent-held state
+* Exercise repeated JavaScript and WebAssembly restarts across URL forms, browser history, tab switching, and opaque-origin frames with parent-held state
 
 ## 1.9.2
 

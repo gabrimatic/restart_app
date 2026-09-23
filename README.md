@@ -73,10 +73,16 @@ await Restart.restartApp(
 | Parameter | Platform | Description |
 |-----------|----------|-------------|
 | `mode` | All | Requested restart behavior: `platformDefault`, `flutterEngine`, `process`, or `notificationFallback`. |
-| `webOrigin` | Web | Null or empty reloads the current URL. Hash-only values such as `#/home` update the hash and reload. Full or relative URLs targeting the same document replace the current history entry and reload; other destinations use location replacement. Relative URLs resolve against `document.baseURI`. |
+| `webOrigin` | Web | Optional reload or navigation target. See [Web destinations](#web-destinations). |
 | `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Restart`. |
 | `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Tap to reopen the app.` |
 | `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |
+
+### Web destinations
+
+* Null or empty `webOrigin` reloads the current URL and keeps its route.
+* A hash-only value such as `#/home` updates the hash and reloads. Changing the hash adds a history entry.
+* A full or relative URL targeting the same document replaces the current history entry and reloads, including identical URLs and fragment removal. Other destinations use location replacement. Relative URLs resolve against `document.baseURI`, including an HTML `base` element.
 
 ## Platform behavior
 

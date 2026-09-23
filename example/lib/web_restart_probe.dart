@@ -26,7 +26,7 @@ Future<String?> _parentRequest(
   final result = Completer<String?>();
   final listener = ((web.Event event) {
     final message = event as web.MessageEvent;
-    if (!identical(message.source, web.window.parent) ||
+    if (!message.source.strictEquals(web.window.parent).toDart ||
         !message.data.typeofEquals('string')) {
       return;
     }
@@ -107,7 +107,7 @@ Future<void> _runProbe() async {
       'Provide a unique run query parameter and case=default, empty, hash, '
       'full, full-query, full-hash, full-identical, full-remove-hash, '
       'full-empty-hash, relative, relative-hash, relative-identical, '
-      'relative-remove-hash, relative-empty-hash, or unsupported.',
+      'relative-remove-hash, relative-empty-hash, invalid-url, or unsupported.',
     );
     return;
   }
@@ -149,12 +149,29 @@ Future<void> _runProbe() async {
     if (previous['destination'] != current.toString()) {
       throw StateError('Wrong destination: $current');
     }
+    if (scenario == 'invalid-url' && previous['invalidURLRejected'] != true) {
+      throw StateError(
+        'Invalid URL rejection was not verified before recovery.',
+      );
+    }
     _show(
       'PASS $scenario\nrun=$run\npreviousBoot=${previous['boot']}\n'
       'boot=$_boot\npreviousDocument=${previous['document']}\n'
-      'document=$_document\ndirty=$_dirty\npersisted=true\nurl=$current',
+      'document=$_document\ndirty=$_dirty\npersisted=true\n'
+      '${scenario == 'invalid-url' ? 'invalidURLRejected=true\n' : ''}'
+      'url=$current',
     );
     return;
+  }
+
+  if (scenario == 'invalid-url') {
+    final rejected = await Restart.restartApp(webOrigin: 'http://[');
+    if (rejected.success ||
+        rejected.code != 'RESTART_FAILED' ||
+        web.window.location.href != current.toString() ||
+        web.window.performance.timeOrigin.toString() != _document) {
+      throw StateError('Invalid URL was not rejected without navigation.');
+    }
   }
 
   final String? origin;
@@ -173,6 +190,7 @@ Future<void> _runProbe() async {
       destination = current.replace(path: '/full-destination');
       origin = destination.toString();
     case 'full-hash':
+    case 'invalid-url':
       destination = current.replace(fragment: '/destination');
       origin = destination.toString();
     case 'full-query':
@@ -212,6 +230,7 @@ Future<void> _runProbe() async {
     'boot': _boot,
     'document': _document,
     'destination': destination.toString(),
+    if (scenario == 'invalid-url') 'invalidURLRejected': true,
   });
   if (_parentStorage) {
     await _parentRequest('write', key, state);

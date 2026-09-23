@@ -3,7 +3,7 @@ title: Configuration
 description: Optional parameters for restart_app restart behavior.
 ---
 
-Default behavior works for normal app restart flows. Pass options only when your app needs a specific platform behavior.
+Use the default mode after completing the [setup for your platform](/quickstart/). Pass options only when your app needs a specific platform behavior.
 
 ```dart
 await Restart.restartApp(
@@ -18,11 +18,12 @@ await Restart.restartApp(
 | Parameter | Platform | Description |
 | --- | --- | --- |
 | `mode` | All | Requested restart behavior: `platformDefault`, `flutterEngine`, `process`, or `notificationFallback`. |
-| `webOrigin` | Web | Custom URL for the reload. When null, the current page reloads and keeps its route. Supports hash strategy, for example `#/home`. |
+| `webOrigin` | Web | Null or empty reloads the current URL. Hash-only values such as `#/home` update the hash and reload. Full or relative URLs targeting the same document replace the current history entry and reload; other destinations use location replacement. |
 | `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Restart`. |
 | `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Tap to reopen the app.` |
 | `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |
 
-Relative `webOrigin` URLs resolve against the HTML document base URL, including
-any `<base href>` element. Persist state before navigation and configure the web
+Relative `webOrigin` URLs resolve against `document.baseURI`, including any
+`<base href>` element. See [web destinations](/reference/api/#web-destinations)
+for history behavior. Persist state before navigation and configure the web
 server to serve the Flutter application at the destination route.
