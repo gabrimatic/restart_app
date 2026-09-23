@@ -70,7 +70,7 @@ This layout is for the older app lifecycle. Apps built with the iOS 27 SDK must 
 
 Rebuild the iOS app after changing Swift code. Hot reload does not apply these changes. Once configured, both `RestartMode.platformDefault` and `RestartMode.flutterEngine` recreate the engine in the existing process. Without configuration, they fail with `IOS_ENGINE_RESTART_NOT_CONFIGURED`.
 
-## Windows and native containers
+## Custom windows and native containers
 
 Request engine restart while the app is active. The default installer replaces a root `FlutterViewController` in a visible window, selected from foreground-active scenes with preference for the key window.
 
