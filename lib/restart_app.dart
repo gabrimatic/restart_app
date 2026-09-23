@@ -123,21 +123,29 @@ class Restart {
   /// Returns the restart behavior available on the current platform.
   static Future<RestartCapability> restartCapability() async {
     try {
-      final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        'restartCapability',
-      );
-
-      return RestartCapability.fromMap(result ?? const {});
+      final result = await _channel.invokeMethod<dynamic>('restartCapability');
+      if (result == null || result is Map) {
+        return RestartCapability.fromMap(result as Map? ?? const {});
+      }
+      return _unavailableCapability(
+          'Unexpected restart capability result: $result');
     } on PlatformException catch (error) {
-      return RestartCapability(
-        fullProcessRestart: false,
-        flutterEngineRestart: false,
-        notificationFallback: false,
-        engineRestartConfigured: false,
-        platformDefaultMode: RestartMode.platformDefault,
-        reason: error.message ?? error.code,
-      );
+      return _unavailableCapability(error.message ?? error.code);
+    } on MissingPluginException catch (error) {
+      return _unavailableCapability(
+          error.message ?? 'Restart plugin is not registered.');
     }
+  }
+
+  static RestartCapability _unavailableCapability(String reason) {
+    return RestartCapability(
+      fullProcessRestart: false,
+      flutterEngineRestart: false,
+      notificationFallback: false,
+      engineRestartConfigured: false,
+      platformDefaultMode: RestartMode.platformDefault,
+      reason: reason,
+    );
   }
 
   /// Restarts the Flutter application and returns a structured result.
@@ -197,6 +205,13 @@ class Restart {
       );
     } on PlatformException catch (error) {
       return RestartResult.error(error, mode);
+    } on MissingPluginException catch (error) {
+      return RestartResult(
+        success: false,
+        mode: mode,
+        code: 'MISSING_PLUGIN',
+        message: error.message ?? 'Restart plugin is not registered.',
+      );
     }
   }
 

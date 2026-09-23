@@ -2,10 +2,20 @@
 
 Released September 23, 2026.
 
-* Bundled agent skills for restart integration and iOS engine configuration, installable from the package with `dart run skills@ get restart_app`
-* Added guidance for structured results, restart modes, state persistence, web routes, background isolates, and iOS lifecycle and failure handling
-* Added a consumer installation check that verifies the bundled skill files and analyzes their Dart examples
-* Documented skill installation and updates in the README and published guides
+* Bundled versioned agent skills for restart integration and iOS engine configuration, installable with `dart run skills@ get restart_app`
+* Added complete skill references for restart modes, structured results, saved state, web routes, background isolates, and iOS lifecycle and failure handling
+* Return a failed `MISSING_PLUGIN` result when native registration is absent, and report unavailable capabilities for missing or malformed channel responses
+* Fixed iOS engine reconfiguration retaining a previous custom view-controller installer; omitting the installer now restores the default root protection
+* Respect an iOS `windowProvider` that returns `nil` instead of selecting another scene, and reject unknown native restart modes
+* Keep the Linux application alive if a deferred `execv` fails; bound saved command-line arguments by `argc` and release replaced argument storage
+* Handle Windows relaunch scheduling failures before reporting success, and clean up the suspended child and native handles on failure
+* Treat an empty macOS application launch result as a failed restart
+* Migrated the iOS example to Flutter's UIScene lifecycle for current Xcode and iOS, with native regression tests for engine failures, repeated requests, and custom hosts
+* Restore example controls after storage or restart failures, require successful state writes before restart, add Android release network permission, and avoid counting skipped platform probes as successful checks
+* Expanded compatibility checks across minimum and current Flutter SDKs, CocoaPods and SwiftPM, and AGP 9 with and without built-in Kotlin
+* Added repeated real desktop restart checks with fresh run identities, process IDs, saved state, and rejected modes, plus Android and browser runtime probes
+* Restored search, code copying, mobile navigation, and appearance controls in the static documentation site
+* Updated platform limits, host configuration, SDK requirements, and skill installation guidance; the plugin's minimum Dart, Flutter, and native OS versions remain unchanged
 
 ## 1.9.1
 

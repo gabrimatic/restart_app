@@ -22,3 +22,7 @@ await Restart.restartApp(
 | `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Restart`. |
 | `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Tap to reopen the app.` |
 | `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |
+
+Relative `webOrigin` URLs resolve against the HTML document base URL, including
+any `<base href>` element. Persist state before navigation and configure the web
+server to serve the Flutter application at the destination route.

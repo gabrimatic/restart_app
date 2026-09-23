@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const [siteDir, rawBasePath] = process.argv.slice(2);
 
@@ -11,7 +12,7 @@ if (!siteDir || !rawBasePath) {
 }
 
 const basePath = `/${rawBasePath.replace(/^\/+|\/+$/g, '')}`;
-const themeStorageKey = `mintlify-docs-theme:${basePath}`;
+
 const textExtensions = new Set([
   '.css',
   '.html',
@@ -38,70 +39,28 @@ async function* walk(dir) {
   }
 }
 
-function addStaticThemeToggle(html) {
-  if (!html.includes('</body>') || html.includes('data-static-mintlify-theme')) {
-    return html;
-  }
-
-  return html.replace(
-    '</body>',
-    `<script data-static-mintlify-theme>
-(function () {
-  var key = ${JSON.stringify(themeStorageKey)};
-  function applyTheme(theme) {
-    var isDark = theme === "dark";
-    document.documentElement.classList.toggle("dark", isDark);
-    document.documentElement.classList.toggle("light", !isDark);
-    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-    try { localStorage.setItem(key, theme); } catch (_) {}
-  }
-  try {
-    var saved = localStorage.getItem(key);
-    if (saved === "light" || saved === "dark") applyTheme(saved);
-  } catch (_) {}
-  document.addEventListener("click", function (event) {
-    var target = event.target.closest && (
-      event.target.closest('button[aria-label="Toggle dark mode"]') ||
-      event.target.closest('button[aria-label*="theme" i]') ||
-      event.target.closest('button[aria-label*="mode" i]')
-    );
-    if (!target) return;
-    event.preventDefault();
-    event.stopPropagation();
-    applyTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
-  }, true);
-})();
-</script></body>`
-  );
-}
-
 function rewrite(text) {
-  const withoutRuntimeScripts = text.replace(
-    /<script\b[^>]*>[\s\S]*?<\/script>/gi,
-    ''
-  );
-
-  return addStaticThemeToggle(withoutRuntimeScripts)
-    .replaceAll('href="/', `href="${basePath}/`)
-    .replaceAll('src="/', `src="${basePath}/`)
-    .replaceAll('content="/', `content="${basePath}/`)
-    .replaceAll('action="/', `action="${basePath}/`)
-    .replaceAll('url(/', `url(${basePath}/`)
-    .replaceAll('"/_next/', `"${basePath}/_next/`)
-    .replaceAll("'/_next/", `'${basePath}/_next/`)
-    .replaceAll('`/_next/', `\`${basePath}/_next/`)
-    .replaceAll('\\"/_next/', `\\"${basePath}/_next/`)
-    .replaceAll("\\'/_next/", `\\'${basePath}/_next/`)
-    .replaceAll('href:\\"/', `href:\\"${basePath}/`)
-    .replaceAll('href:"/', `href:"${basePath}/`)
-    .replaceAll("href:'/", `href:'${basePath}/`)
-    .replaceAll('href: \\"/', `href: \\"${basePath}/`)
-    .replaceAll('href: "/', `href: "${basePath}/`)
-    .replaceAll("href: '/", `href: '${basePath}/`)
-    .replaceAll('c.p="/_next/"', `c.p="${basePath}/_next/"`)
-    .replaceAll("c.p='/_next/'", `c.p='${basePath}/_next/'`);
+  return text.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/((?:href|src|content|action)=")\/(?!\/)([^"\s]*)/g,
+      (match, prefix, path) => path === basePath.slice(1) || path.startsWith(`${basePath.slice(1)}/`)
+        ? match : `${prefix}${basePath}/${path}`)
+    .replace(/url\(\/(?!\/)([^)]*)\)/g, (match, path) =>
+      path.startsWith(`${basePath.slice(1)}/`) ? match : `url(${basePath}/${path})`);
 }
 
+function plainText(html) {
+  const entities = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi, (_, value) => {
+      if (value.startsWith('#x')) return String.fromCodePoint(parseInt(value.slice(2), 16));
+      if (value.startsWith('#')) return String.fromCodePoint(parseInt(value.slice(1), 10));
+      return entities[value.toLowerCase()];
+    }).replace(/\s+/g, ' ').trim();
+}
+
+const searchPages = [];
 let changed = 0;
 
 for await (const path of walk(siteDir)) {
@@ -110,13 +69,27 @@ for await (const path of walk(siteDir)) {
   }
 
   const original = await readFile(path, 'utf8');
-  const updated = rewrite(original);
+  let updated = rewrite(original);
+  if (path.endsWith('.html') && updated.includes('</body>')) {
+    const route = relative(siteDir, path).replace(/\\/g, '/').replace(/index\.html$/, '');
+    const title = plainText(updated.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || '');
+    const body = updated.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1];
+    if (title && body && route !== 'index/') {
+      searchPages.push({ title, text: plainText(body), url: `${basePath}/${route}` });
+    }
+    updated = updated.replace('</body>', `<script defer src="${basePath}/static-docs.js" data-static-docs data-base-path="${basePath}"></script></body>`);
+  }
 
   if (updated !== original) {
     await writeFile(path, updated);
     changed += 1;
   }
 }
+
+searchPages.sort((a, b) => a.url.localeCompare(b.url));
+await writeFile(join(siteDir, 'search-index.json'), JSON.stringify(searchPages));
+await writeFile(join(siteDir, 'static-docs.js'), await readFile(
+  fileURLToPath(new URL('./static-docs.js', import.meta.url)), 'utf8'));
 
 await Promise.all([
   rm(join(siteDir, '.mintignore'), { force: true }),

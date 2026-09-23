@@ -30,4 +30,5 @@ Reports related to process lifecycle abuse, notification permission misuse, nati
 
 | Version | Supported |
 |---------|-----------|
-| 1.8.x   | Yes       |
+| Latest 1.9.x | Yes |
+| Older releases | Upgrade to the latest patch |

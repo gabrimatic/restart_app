@@ -27,18 +27,18 @@ Uri get _httpCheckUri {
   return Uri.parse('https://example.com');
 }
 
-final String restartCheckBootToken =
-    DateTime.now().microsecondsSinceEpoch.toString();
+final String restartCheckBootToken = DateTime.now().microsecondsSinceEpoch
+    .toString();
 int restartCheckDirtyState = 0;
 
 Future<int> markRestartCheckDirtyState() async {
-  restartCheckDirtyState += 1;
-
   final prefs = await SharedPreferences.getInstance();
   final attempts = (prefs.getInt('restartAttempts') ?? 0) + 1;
-  await prefs.setInt('restartAttempts', attempts);
+  if (!await prefs.setInt('restartAttempts', attempts)) {
+    throw StateError('Could not save the restart attempt.');
+  }
 
-  return restartCheckDirtyState;
+  return ++restartCheckDirtyState;
 }
 
 void resetRestartCheckDirtyState() {
@@ -111,7 +111,9 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
       final prefs = await SharedPreferences.getInstance();
       final launchCount = (prefs.getInt('launchCount') ?? 0) + 1;
       final restartAttempts = prefs.getInt('restartAttempts') ?? 0;
-      await prefs.setInt('launchCount', launchCount);
+      if (!await prefs.setInt('launchCount', launchCount)) {
+        throw StateError('Could not save the launch count.');
+      }
 
       if (!mounted) {
         return 'launch=$launchCount, restartAttempts=$restartAttempts';
@@ -173,7 +175,8 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
     await probe('dart clean state', () async {
       if (restartCheckDirtyState != 0) {
         throw StateError(
-            'dirty state survived restart: $restartCheckDirtyState');
+          'dirty state survived restart: $restartCheckDirtyState',
+        );
       }
       return 'dirty=0, boot=$restartCheckBootToken';
     });
@@ -184,8 +187,9 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
 
     setState(() {
       _results = results;
-      _summary =
-          _allPassResults(results) ? 'All checks passed' : 'Some checks failed';
+      _summary = _allPassResults(results)
+          ? 'All checks passed'
+          : 'Some checks failed';
       _running = false;
     });
   }

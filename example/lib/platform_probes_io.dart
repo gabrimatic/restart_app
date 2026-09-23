@@ -17,7 +17,8 @@ Future<List<PlatformProbe>> runPlatformProbes({
 
   Future<void> probe(String name, Future<String> Function() body) async {
     try {
-      probes.add((name: name, ok: true, detail: await body()));
+      final detail = await body().timeout(const Duration(seconds: 12));
+      probes.add((name: name, ok: true, detail: detail));
     } catch (error) {
       probes.add((name: name, ok: false, detail: '$error'));
     }
@@ -35,25 +36,33 @@ Future<List<PlatformProbe>> runPlatformProbes({
     return 'ok';
   });
 
-  await probe('sqflite', () async {
-    if (!(Platform.isAndroid || Platform.isIOS || Platform.isMacOS)) {
-      return 'skipped on this platform';
-    }
-
-    final db = await openDatabase(
-      '${await getDatabasesPath()}/restart_app_example.db',
-      version: 1,
-      onCreate: (database, version) {
-        return database.execute(
-          'CREATE TABLE IF NOT EXISTS probe(id INTEGER PRIMARY KEY AUTOINCREMENT, boot TEXT)',
+  if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+    await probe('sqflite', () async {
+      final db = await openDatabase(
+        '${await getDatabasesPath()}/restart_app_example.db',
+        version: 1,
+        onCreate: (database, version) {
+          return database.execute(
+            'CREATE TABLE IF NOT EXISTS probe(id INTEGER PRIMARY KEY AUTOINCREMENT, boot TEXT)',
+          );
+        },
+      );
+      try {
+        await db.insert('probe', {'boot': bootToken});
+        final rows = await db.query(
+          'probe',
+          where: 'boot = ?',
+          whereArgs: [bootToken],
         );
-      },
-    );
-    await db.insert('probe', {'boot': bootToken});
-    final rows = await db.query('probe');
-    await db.close();
-    return 'rows=${rows.length}';
-  });
+        if (rows.isEmpty) {
+          throw StateError('Missing row for the current boot.');
+        }
+        return 'current boot stored';
+      } finally {
+        await db.close();
+      }
+    });
+  }
 
   await probe('device info', () async {
     final plugin = DeviceInfoPlugin();
@@ -80,17 +89,15 @@ Future<List<PlatformProbe>> runPlatformProbes({
     return 'unknown platform';
   });
 
-  await probe('webview', () async {
-    if (!(Platform.isAndroid || Platform.isIOS)) {
-      return 'skipped on this platform';
-    }
-
-    final controller = WebViewController();
-    await controller.loadHtmlString(
-      '<html><body><strong>WebView alive after restart</strong></body></html>',
-    );
-    return 'created';
-  });
+  if (Platform.isAndroid || Platform.isIOS) {
+    await probe('webview', () async {
+      final controller = WebViewController();
+      await controller.loadHtmlString(
+        '<html><body><strong>WebView alive after restart</strong></body></html>',
+      );
+      return 'created';
+    });
+  }
 
   return probes;
 }

@@ -87,3 +87,10 @@ This uses a temporary consumer with a path dependency, installs the skills with
 the Dart Skills CLI, compares the installed files, and analyzes all Dart code
 blocks as standalone libraries. Keep those examples complete and compilable.
 `dart pub publish --dry-run` must also include the skill files.
+
+## Runtime verification
+
+Follow the [restart verification guide](.github/ci/README.md) for repeatable
+Android, iOS, desktop, and browser checks. Save state before each restart and
+require a fresh boot marker afterward. A green build or mocked channel test is
+not evidence that the native application relaunched.

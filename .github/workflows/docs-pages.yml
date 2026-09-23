@@ -41,6 +41,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter test test/docs_site_test.dart
+      - run: node --test doc/scripts/prepare-github-pages.test.mjs
       - run: npm install -g mint
       - run: mint validate
         working-directory: doc

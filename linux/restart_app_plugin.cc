@@ -1,4 +1,5 @@
 #include "include/restart_app/restart_app_plugin.h"
+#include "restart_app_argv.h"
 
 #include <flutter_linux/flutter_linux.h>
 #include <gtk/gtk.h>
@@ -31,9 +32,13 @@ static gboolean resolve_exe_path(char *buf, size_t buf_size) {
   return TRUE;
 }
 
+static const gchar *response_error_message(const GError *error);
+
 // Scheduled via g_timeout_add so the method channel response has time to reach
 // Dart before the process is replaced.
 static gboolean do_restart(gpointer user_data) {
+  (void)user_data;
+
   char exe_path[PATH_MAX];
   if (!resolve_exe_path(exe_path, sizeof(exe_path))) {
     g_warning("restart_app: failed to resolve executable path: %s",
@@ -56,10 +61,12 @@ static gboolean do_restart(gpointer user_data) {
   }
 
   // execv only returns on failure. The Dart side already received "ok", so
-  // there is no channel to report through. Terminate to avoid leaving a
-  // half-dead process that Dart believes has restarted.
-  g_warning("restart_app: execv failed: %s", strerror(errno));
-  _exit(1);
+  // there is no channel to report through. Keep the current process alive so
+  // a transient launch failure does not turn a recoverable restart into data
+  // loss. The caller can inspect this warning and retry explicitly.
+  g_warning("restart_app: execv failed; keeping current process alive: %s",
+            strerror(errno));
+  return G_SOURCE_REMOVE;
 }
 
 static void respond_restart_capability(FlMethodCall *method_call) {
@@ -80,7 +87,8 @@ static void respond_restart_capability(FlMethodCall *method_call) {
       FL_METHOD_RESPONSE(fl_method_success_response_new(result));
   g_autoptr(GError) error = nullptr;
   if (!fl_method_call_respond(method_call, response, &error)) {
-    g_warning("restart_app: failed to send response: %s", error->message);
+    g_warning("restart_app: failed to send response: %s",
+              response_error_message(error));
   }
 }
 
@@ -110,6 +118,10 @@ static gboolean lookup_bool_arg(FlValue *args, const gchar *name,
   }
 
   return fl_value_get_bool(value);
+}
+
+static const gchar *response_error_message(const GError *error) {
+  return error == nullptr ? "unknown channel error" : error->message;
 }
 
 static FlMethodResponse *restart_success_response(gboolean structured_result) {
@@ -171,18 +183,23 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
         restart_success_response(structured_result);
     g_autoptr(GError) error = nullptr;
     if (!fl_method_call_respond(method_call, response, &error)) {
-      g_warning("restart_app: failed to send response: %s", error->message);
+      g_warning("restart_app: failed to send response: %s",
+                response_error_message(error));
+      return;
     }
 
     // 100ms delay to let the response reach Dart before execv replaces the
     // process. Matches the delay used on Android, macOS, and Windows.
-    g_timeout_add(100, do_restart, nullptr);
+    if (g_timeout_add(100, do_restart, nullptr) == 0) {
+      g_warning("restart_app: failed to schedule deferred restart");
+    }
   } else {
     g_autoptr(FlMethodResponse) response =
         FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
     g_autoptr(GError) error = nullptr;
     if (!fl_method_call_respond(method_call, response, &error)) {
-      g_warning("restart_app: failed to send response: %s", error->message);
+      g_warning("restart_app: failed to send response: %s",
+                response_error_message(error));
     }
   }
 }
@@ -197,6 +214,7 @@ void restart_app_plugin_register_with_registrar(FlPluginRegistrar *registrar) {
 }
 
 void restart_app_plugin_store_argv(int argc, char **argv) {
-  (void)argc;
-  g_argv = g_strdupv(argv);
+  if (!restart_app_replace_argv(&g_argv, argc, argv)) {
+    g_warning("restart_app: failed to copy command-line arguments");
+  }
 }

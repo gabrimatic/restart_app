@@ -78,6 +78,40 @@ jobs:
       - run: flutter test --platform chrome test/restart_web_test.dart
       - run: cd example && flutter pub get && flutter test
 
+  compatibility:
+    name: Consumer ${{ matrix.label }} (Flutter ${{ matrix.flutter }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: minimum
+            flutter: '3.22.0'
+            dart: '3.4'
+          - label: swiftpm-transition
+            flutter: '3.24.0'
+            dart: '3.5'
+          - label: dart-3.8
+            flutter: '3.32.0'
+            dart: '3.8'
+          - label: swiftpm-default
+            flutter: '3.44.0'
+            dart: '3.12'
+          - label: latest
+            flutter: '3.47.5'
+            dart: '3.13'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ matrix.flutter }}
+          cache: true
+      - run: >-
+          python3 .github/ci/check_compatibility.py
+          --expected-flutter "${{ matrix.flutter }}"
+          --expected-dart "${{ matrix.dart }}"
+          --label "${{ matrix.label }}"
+
   build-android:
     name: Build Android example
     runs-on: ubuntu-latest
@@ -89,27 +123,67 @@ jobs:
           cache: true
       - run: cd example && flutter pub get && flutter build apk
 
-  build-android-agp9:
-    name: Build Android on AGP ${{ matrix.agp }}
+  build-android-consumers:
+    name: Android consumer ${{ matrix.label }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - agp: '9.0.1'
+          - label: minimum
+            flutter: '3.22.0'
+            options: '--minimum --target-sdk 34'
+          - label: current-target
+            flutter: '3.47.5'
+            options: '--target-sdk 37 --compile-minor 0'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ matrix.flutter }}
+          cache: true
+      - run: python3 .github/ci/build_android_consumer.py "$RUNNER_TEMP/android_consumer" ${{ matrix.options }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-consumer-${{ matrix.label }}
+          path: ${{ runner.temp }}/android_consumer/build/app/outputs/flutter-apk/app-debug.apk
+
+  build-android-agp9:
+    name: Build Android on AGP ${{ matrix.agp }} (built-in Kotlin=${{ matrix.built_in_kotlin }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flutter: '3.44.0'
+            agp: '9.0.1'
             gradle: '9.1.0'
-          - agp: '9.1.0'
+            built_in_kotlin: 'false'
+          - flutter: '3.44.0'
+            agp: '9.1.0'
             gradle: '9.5.0'
+            built_in_kotlin: 'false'
+          - flutter: '3.47.5'
+            agp: '9.0.1'
+            gradle: '9.1.0'
+            built_in_kotlin: 'true'
+          - flutter: '3.47.5'
+            agp: '9.1.0'
+            gradle: '9.5.0'
+            built_in_kotlin: 'true'
     steps:
       - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: ${{ matrix.flutter }}
           cache: true
       # The example app stays on AGP 8, so a fresh app pins the AGP 9 toolchain
-      # instead. AGP 9 defaults to built-in Kotlin while the Flutter templates
-      # still generate android.builtInKotlin=false, and that combination is what
-      # broke the plugin in 1.9.0 (issue #56).
+      # instead. Flutter 3.44 exercises the temporary legacy-KGP compatibility
+      # path, while Flutter 3.47 exercises the supported built-in Kotlin path.
       - run: flutter create --platforms=android --project-name restart_app_agp9_smoke /tmp/restart_app_agp9_smoke
       - name: Pin AGP ${{ matrix.agp }} and Gradle ${{ matrix.gradle }}
         working-directory: /tmp/restart_app_agp9_smoke/android
@@ -118,8 +192,11 @@ jobs:
           wrapper=gradle/wrapper/gradle-wrapper.properties
           sed -i -E 's|(com\.android\.application"\)? version ")[0-9.]+"|\1${{ matrix.agp }}"|' "$settings"
           sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-${{ matrix.gradle }}-\1.zip#' "$wrapper"
+          sed -i -E '/^android\.builtInKotlin=/d' gradle.properties
+          echo 'android.builtInKotlin=${{ matrix.built_in_kotlin }}' >> gradle.properties
           grep -qE 'com\.android\.application"\)? version "${{ matrix.agp }}"' "$settings"
           grep -qE 'gradle-${{ matrix.gradle }}-(all|bin)\.zip' "$wrapper"
+          grep -qE '^android\.builtInKotlin=${{ matrix.built_in_kotlin }}$' gradle.properties
           cat "$settings" "$wrapper" gradle.properties
       - run: cd /tmp/restart_app_agp9_smoke && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
       - run: cd /tmp/restart_app_agp9_smoke && flutter build apk --debug
@@ -164,6 +241,69 @@ jobs:
       - run: cd /tmp/restart_app_macos_smoke && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
       - run: cd /tmp/restart_app_macos_smoke && flutter build macos
 
+  build-darwin-dependency-managers:
+    name: Build iOS and macOS with ${{ matrix.manager }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - manager: CocoaPods
+            flutter: '3.47.5'
+            config: '--no-enable-swift-package-manager'
+            project: restart_app_cocoapods
+          - manager: SwiftPM-legacy
+            flutter: '3.24.0'
+            config: '--enable-swift-package-manager'
+            project: restart_app_swiftpm_legacy
+          - manager: SwiftPM
+            flutter: '3.47.5'
+            config: '--enable-swift-package-manager'
+            project: restart_app_swiftpm
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ matrix.flutter }}
+          cache: true
+      - run: flutter config ${{ matrix.config }}
+      - name: Create native consumer
+        run: >-
+          flutter create --platforms=ios,macos
+          --project-name ${{ matrix.project }}
+          "$RUNNER_TEMP/${{ matrix.project }}"
+      - name: Add restart_app and build both Apple platforms
+        run: |
+          cd "$RUNNER_TEMP/${{ matrix.project }}"
+          flutter pub add restart_app --path "$GITHUB_WORKSPACE"
+          flutter build ios --no-codesign
+          flutter build macos
+
+  ios-runner-tests:
+    name: Native iOS RunnerTests on simulator
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          cache: true
+      - run: flutter config --enable-swift-package-manager
+      - name: Generate the example iOS project
+        run: cd example && flutter pub get && flutter build ios --no-codesign --config-only
+      - name: Select an available iPhone simulator
+        run: |
+          simulator_id="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
+          test -n "$simulator_id"
+          echo "IOS_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
+      - name: Run native RunnerTests
+        run: >-
+          xcodebuild test
+          -workspace example/ios/Runner.xcworkspace
+          -scheme Runner
+          -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID"
+          CODE_SIGNING_ALLOWED=NO
+
   build-windows:
     name: Build Windows example
     runs-on: windows-latest
@@ -194,19 +334,12 @@ jobs:
       - run: cd /tmp/restart_proof && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
       - run: cp "$GITHUB_WORKSPACE/.github/ci/restart_proof_main.dart" /tmp/restart_proof/lib/main.dart
       - run: cd /tmp/restart_proof && flutter build linux --release
-      - name: Run app and verify a second instance wrote the proof
-        run: |
-          xvfb-run -a /tmp/restart_proof/build/linux/x64/release/bundle/restart_proof >/dev/null 2>&1 &
-          for i in $(seq 1 45); do
-            [ -f "$HOME/restart_app_ci_proof/restart_proof.txt" ] && break
-            sleep 2
-          done
-          echo "--- restart_result ---"
-          cat "$HOME/restart_app_ci_proof/restart_result.txt" || true
-          echo "--- proof ---"
-          cat "$HOME/restart_app_ci_proof/restart_proof.txt"
-          grep -q RESTARTED_OK "$HOME/restart_app_ci_proof/restart_proof.txt"
-          pkill -f restart_proof || true
+      - name: Stress native restarts and verify fresh state
+        run: xvfb-run -a python3 .github/ci/run_desktop_proof.py /tmp/restart_proof/build/linux/x64/release/bundle/restart_proof
+      - uses: actions/upload-artifact@v4
+        with:
+          name: restart-proof-linux
+          path: desktop-proof.json
 
   run-windows:
     name: Windows restart proof
@@ -224,21 +357,12 @@ jobs:
         working-directory: ${{ runner.temp }}\restart_proof
       - run: flutter build windows --release
         working-directory: ${{ runner.temp }}\restart_proof
-      - name: Run app and verify a second instance wrote the proof
-        working-directory: ${{ runner.temp }}\restart_proof
-        run: |
-          $proofDir = "$env:USERPROFILE\restart_app_ci_proof"
-          Start-Process "build\windows\x64\runner\Release\restart_proof.exe"
-          for ($i = 0; $i -lt 45; $i++) {
-            if (Test-Path "$proofDir\restart_proof.txt") { break }
-            Start-Sleep -Seconds 2
-          }
-          Write-Host "--- restart_result ---"
-          if (Test-Path "$proofDir\restart_result.txt") { Get-Content "$proofDir\restart_result.txt" }
-          Write-Host "--- proof ---"
-          Get-Content "$proofDir\restart_proof.txt"
-          if (-not (Select-String -Path "$proofDir\restart_proof.txt" -Pattern "RESTARTED_OK" -Quiet)) { exit 1 }
-          Stop-Process -Name restart_proof -Force -ErrorAction SilentlyContinue
+      - name: Stress native restarts and verify fresh state
+        run: python .github/ci/run_desktop_proof.py "$env:RUNNER_TEMP/restart_proof/build/windows/x64/runner/Release/restart_proof.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: restart-proof-windows
+          path: desktop-proof.json
 
   run-macos:
     name: macOS restart proof
@@ -253,28 +377,12 @@ jobs:
       - run: cd /tmp/restart_proof && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
       - run: cp "$GITHUB_WORKSPACE/.github/ci/restart_proof_main.dart" /tmp/restart_proof/lib/main.dart
       - run: cd /tmp/restart_proof && flutter build macos --debug
-      - name: Run app and verify a second instance wrote the proof
-        run: |
-          open /tmp/restart_proof/build/macos/Build/Products/Debug/restart_proof.app
-          # The default macOS app template is sandboxed, so HOME resolves to
-          # the app container; check both locations.
-          CONTAINER="$HOME/Library/Containers/com.example.restartProof/Data"
-          for i in $(seq 1 45); do
-            if [ -f "$CONTAINER/restart_app_ci_proof/restart_proof.txt" ] \
-              || [ -f "$HOME/restart_app_ci_proof/restart_proof.txt" ]; then
-              break
-            fi
-            sleep 2
-          done
-          PROOF="$HOME/restart_app_ci_proof/restart_proof.txt"
-          [ -f "$CONTAINER/restart_app_ci_proof/restart_proof.txt" ] \
-            && PROOF="$CONTAINER/restart_app_ci_proof/restart_proof.txt"
-          echo "--- restart_result ---"
-          cat "${PROOF%restart_proof.txt}restart_result.txt" || true
-          echo "--- proof ---"
-          cat "$PROOF"
-          grep -q RESTARTED_OK "$PROOF"
-          pkill -f restart_proof || true
+      - name: Stress native restarts and verify fresh state
+        run: python3 .github/ci/run_desktop_proof.py /tmp/restart_proof/build/macos/Build/Products/Debug/restart_proof.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: restart-proof-macos
+          path: desktop-proof.json
 
   kotlin-format:
     name: Kotlin format
@@ -297,7 +405,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: sudo apt-get install -y clang-format
-      - run: clang-format --dry-run --Werror linux/restart_app_plugin.cc windows/restart_app_plugin.cpp windows/restart_app_plugin_c_api.cpp
+      - run: clang-format --dry-run --Werror linux/*.cc linux/*.h windows/restart_app_plugin.cpp windows/restart_app_plugin_c_api.cpp
+      - name: Check bounded Linux argument ownership with sanitizers
+        run: |
+          clang++ -std=c++14 -Wall -Wextra -Werror -fsanitize=address,undefined -g linux/restart_app_argv.cc linux/restart_app_argv_test.cc -o /tmp/restart_app_argv_test
+          /tmp/restart_app_argv_test
 
   skills:
     name: Package skills

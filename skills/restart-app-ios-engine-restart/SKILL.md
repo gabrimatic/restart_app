@@ -21,12 +21,13 @@ Read [host setup](references/host-setup.md) for the matching integration:
   `application(_:didFinishLaunchingWithOptions:)` and add the replacement
   engine callback.
 - Custom engine or add-to-app: use `setEngineFactory` only when the host owns
-  engine creation, startup, and plugin registration. Do not copy the package
-  example's custom engine ownership into a normal Flutter app.
+  engine creation, startup, and plugin registration. The package example uses
+  the standard UIScene setup; custom hosts must preserve their own ownership.
 
 `RestartAppPlugin.configureEngineRestart` is a Swift API, not a Dart method.
 There is no Dart-only substitute for host configuration. Hot reload does not
-apply AppDelegate changes; rebuild the iOS app.
+apply AppDelegate changes; rebuild the iOS app. Xcode 27 requires UIScene
+lifecycle adoption. Updating only the restart callback does not migrate the host.
 
 ## Restart contract
 

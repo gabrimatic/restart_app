@@ -223,4 +223,65 @@ void main() {
     expect(capability.platformDefaultMode, RestartMode.platformDefault);
     expect(capability.reason, 'Capability unavailable.');
   });
+
+  test('restartApp returns a failed result when the plugin is missing',
+      () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
+
+    final result = await Restart.restartApp(mode: RestartMode.process);
+
+    expect(result.success, isFalse);
+    expect(result.mode, RestartMode.process);
+    expect(result.code, 'MISSING_PLUGIN');
+    expect(result.message, isNotEmpty);
+  });
+
+  test('restartCapability reports unavailable when the plugin is missing',
+      () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
+
+    final capability = await Restart.restartCapability();
+
+    expect(capability.fullProcessRestart, isFalse);
+    expect(capability.flutterEngineRestart, isFalse);
+    expect(capability.notificationFallback, isFalse);
+    expect(capability.engineRestartConfigured, isFalse);
+    expect(capability.reason, isNotEmpty);
+  });
+
+  test('restartCapability handles malformed channel responses', () async {
+    for (final response in ['ok', 42, <Object>[]]) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async => response);
+
+      final capability = await Restart.restartCapability();
+
+      expect(capability.fullProcessRestart, isFalse);
+      expect(capability.flutterEngineRestart, isFalse);
+      expect(capability.platformDefaultMode, RestartMode.platformDefault);
+      expect(capability.reason, isNotEmpty);
+    }
+  });
+
+  test('restartCapability tolerates null and unknown fields', () async {
+    for (final response in [
+      null,
+      <String, Object?>{
+        'fullProcessRestart': 'true',
+        'flutterEngineRestart': 1,
+        'platformDefaultMode': 'futureMode',
+        'reason': 42,
+      }
+    ]) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async => response);
+      final capability = await Restart.restartCapability();
+      expect(capability.fullProcessRestart, isFalse);
+      expect(capability.flutterEngineRestart, isFalse);
+      expect(capability.platformDefaultMode, RestartMode.platformDefault);
+      expect(capability.reason, response == null ? null : '42');
+    }
+  });
 }

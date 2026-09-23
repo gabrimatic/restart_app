@@ -3,9 +3,7 @@ import 'package:restart_app_example/main.dart';
 
 void main() {
   testWidgets('example shows restart controls', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const RestartAppExample(runChecksOnStart: false),
-    );
+    await tester.pumpWidget(const RestartAppExample(runChecksOnStart: false));
 
     expect(find.text('Restart App Example'), findsOneWidget);
     expect(find.text('Restart app'), findsOneWidget);

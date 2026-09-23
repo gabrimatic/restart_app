@@ -63,7 +63,7 @@ class RestartWeb {
   /// the current page and preserves the current route. Pass a hash path such
   /// as `#/home` to move to that hash route and reload, or a full URL to
   /// replace the current location entirely. Relative URLs resolve against the
-  /// current page, per normal browser navigation rules.
+  /// document's base URL, including any HTML `base` element.
   String restart(String? webOrigin) {
     try {
       final origin =

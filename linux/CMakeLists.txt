@@ -6,6 +6,7 @@ set(PLUGIN_NAME "restart_app_plugin")
 
 add_library(${PLUGIN_NAME} SHARED
   "restart_app_plugin.cc"
+  "restart_app_argv.cc"
 )
 
 apply_standard_settings(${PLUGIN_NAME})

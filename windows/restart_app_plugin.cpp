@@ -5,6 +5,7 @@
 #include <flutter/standard_method_codec.h>
 #include <windows.h>
 
+#include <exception>
 #include <memory>
 #include <string>
 #include <thread>
@@ -12,6 +13,26 @@
 #include <vector>
 
 namespace restart_app {
+
+namespace {
+
+void close_process_handles(HANDLE process, HANDLE thread) {
+  if (thread != nullptr) {
+    CloseHandle(thread);
+  }
+  if (process != nullptr) {
+    CloseHandle(process);
+  }
+}
+
+void terminate_suspended_process(HANDLE process, HANDLE thread) {
+  if (process != nullptr && !TerminateProcess(process, 1)) {
+    OutputDebugStringW(L"restart_app: failed to terminate suspended child\n");
+  }
+  close_process_handles(process, thread);
+}
+
+} // namespace
 
 void RestartAppPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
@@ -115,14 +136,20 @@ void RestartAppPlugin::HandleMethodCall(
   // argv[0], but when lpApplicationName is set CreateProcessW still expects
   // argv[0] in lpCommandLine. We pass the full original command line as-is.
   // CreateProcessW may modify the buffer in place, so use a writable copy.
-  std::wstring cmd_line = GetCommandLineW();
+  const wchar_t *original_cmd_line = GetCommandLineW();
+  if (original_cmd_line == nullptr) {
+    result->Error("RESTART_FAILED",
+                  "Could not resolve the process command line");
+    return;
+  }
+  std::wstring cmd_line = original_cmd_line;
   std::vector<wchar_t> cmd_buf(cmd_line.begin(), cmd_line.end());
   cmd_buf.push_back(L'\0');
 
   // Create the new instance suspended so the launch outcome is known before
   // the response is sent, without two live app instances running side by side.
-  // MSIX/Store-packaged apps, for example, cannot relaunch via CreateProcess
-  // and must surface that as an error instead of a false success.
+  // Hosts whose packaging or activation policy rejects CreateProcess surface
+  // that failure before the current process is terminated.
   STARTUPINFOW si = {};
   si.cb = sizeof(si);
   PROCESS_INFORMATION pi = {};
@@ -139,9 +166,59 @@ void RestartAppPlugin::HandleMethodCall(
       &si, &pi);
 
   if (!ok) {
+    const DWORD error = GetLastError();
     result->Error("RESTART_FAILED",
                   "Failed to launch a new application instance (error " +
-                      std::to_string(GetLastError()) + ")");
+                      std::to_string(error) + ")");
+    return;
+  }
+
+  HANDLE response_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  if (response_event == nullptr) {
+    const DWORD error = GetLastError();
+    terminate_suspended_process(pi.hProcess, pi.hThread);
+    result->Error("RESTART_FAILED",
+                  "Could not schedule the application relaunch (event " +
+                      std::to_string(error) + ")");
+    return;
+  }
+
+  // Resume the child and terminate on a detached thread so the platform
+  // message loop can pump the response back to Dart before the process exits.
+  // Start this before sending success so a thread-creation failure can still
+  // be returned as a normal platform error while the child is suspended. The
+  // event keeps the thread from racing the channel response.
+  try {
+    std::thread([process = pi.hProcess, thread = pi.hThread, response_event]() {
+      const DWORD response_status =
+          WaitForSingleObject(response_event, INFINITE);
+      CloseHandle(response_event);
+      if (response_status != WAIT_OBJECT_0) {
+        OutputDebugStringW(L"restart_app: response event was not signaled\n");
+        terminate_suspended_process(process, thread);
+        return;
+      }
+
+      // Short delay to let the message loop drain the response to Dart.
+      Sleep(150);
+
+      if (ResumeThread(thread) == static_cast<DWORD>(-1)) {
+        // The child never ran; keep the current process alive rather than
+        // exiting into nothing.
+        OutputDebugStringW(L"restart_app: ResumeThread failed\n");
+        terminate_suspended_process(process, thread);
+        return;
+      }
+
+      close_process_handles(process, thread);
+      ExitProcess(0);
+    }).detach();
+  } catch (const std::exception &error) {
+    CloseHandle(response_event);
+    terminate_suspended_process(pi.hProcess, pi.hThread);
+    result->Error("RESTART_FAILED",
+                  "Could not schedule the application relaunch: " +
+                      std::string(error.what()));
     return;
   }
 
@@ -156,26 +233,9 @@ void RestartAppPlugin::HandleMethodCall(
     result->Success(flutter::EncodableValue("ok"));
   }
 
-  // Resume the child and terminate on a detached thread so the platform
-  // message loop can pump the response back to Dart before the process exits.
-  std::thread([process = pi.hProcess, thread = pi.hThread]() {
-    // Short delay to let the message loop drain the response to Dart.
-    Sleep(150);
-
-    if (ResumeThread(thread) == static_cast<DWORD>(-1)) {
-      // The child never ran; keep the current process alive rather than
-      // exiting into nothing.
-      OutputDebugStringW(L"restart_app: ResumeThread failed\n");
-      TerminateProcess(process, 1);
-      CloseHandle(thread);
-      CloseHandle(process);
-      return;
-    }
-
-    CloseHandle(thread);
-    CloseHandle(process);
-    ExitProcess(0);
-  }).detach();
+  if (!SetEvent(response_event)) {
+    OutputDebugStringW(L"restart_app: failed to signal response event\n");
+  }
 }
 
 } // namespace restart_app

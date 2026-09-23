@@ -138,10 +138,12 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
     self.beforeRestart = beforeRestart
     self.afterRestart = afterRestart
 
-    if let viewControllerInstaller = viewControllerInstaller {
-      self.viewControllerInstaller = viewControllerInstaller
-      usesCustomViewControllerInstaller = true
-    }
+    usesCustomViewControllerInstaller = viewControllerInstaller != nil
+    self.viewControllerInstaller =
+      viewControllerInstaller ?? { window, viewController in
+        window.rootViewController = viewController
+        window.makeKeyAndVisible()
+      }
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -160,7 +162,15 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
   private func handleRestartApp(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     let args = call.arguments as? [String: Any] ?? [:]
     let modeName = args["mode"] as? String ?? IOSRestartMode.platformDefault.rawValue
-    let mode = IOSRestartMode(rawValue: modeName) ?? .platformDefault
+    guard let mode = IOSRestartMode(rawValue: modeName) else {
+      result(
+        FlutterError(
+          code: "UNSUPPORTED_RESTART_MODE",
+          message: "Unsupported restart mode: \(modeName)",
+          details: nil
+        ))
+      return
+    }
     let structuredResult = args["structuredResult"] as? Bool ?? false
 
     switch mode {
@@ -293,8 +303,8 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
   }
 
   private static func activeWindow() -> UIWindow? {
-    if let window = windowProvider?() {
-      return window
+    if let windowProvider = windowProvider {
+      return windowProvider()
     }
 
     if #available(iOS 13.0, *) {

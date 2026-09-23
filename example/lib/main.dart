@@ -96,23 +96,29 @@ class _HomePageState extends State<HomePage> {
       _lastResult = pendingMessage;
     });
 
-    await markRestartCheckDirtyState();
-    final result = await restart();
-
-    if (!mounted) {
-      return;
-    }
-
-    if (!result.success) {
+    try {
+      await markRestartCheckDirtyState();
+      final result = await restart();
+      if (!result.success) {
+        resetRestartCheckDirtyState();
+      }
+      if (mounted) {
+        setState(() {
+          _lastResult = result.success
+              ? 'Restart accepted with mode ${result.mode.name}.'
+              : '${result.code}: ${result.message}';
+        });
+      }
+    } catch (error) {
       resetRestartCheckDirtyState();
+      if (mounted) {
+        setState(() => _lastResult = 'Restart failed: $error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
-
-    setState(() {
-      _busy = false;
-      _lastResult = result.success
-          ? 'Restart accepted with mode ${result.mode.name}.'
-          : '${result.code}: ${result.message}';
-    });
   }
 
   Future<void> _showCapability() async {

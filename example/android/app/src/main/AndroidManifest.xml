@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="gabrimatic.info.restart_example">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Android 11+ package visibility: required for url_launcher's
          canLaunchUrl to see browsers that handle https links. -->
     <queries>

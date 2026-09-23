@@ -6,12 +6,7 @@ Future<List<PlatformProbe>> runPlatformProbes({
   required String bootToken,
   required int dartOnlyDirtyState,
 }) async {
-  return [
-    (name: 'file storage', ok: true, detail: 'skipped on web'),
-    (name: 'sqflite', ok: true, detail: 'skipped on web'),
-    (name: 'device info', ok: true, detail: 'skipped on web'),
-    (name: 'webview', ok: true, detail: 'skipped on web'),
-  ];
+  return const [];
 }
 
 class PlatformPreview extends StatelessWidget {

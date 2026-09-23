@@ -49,13 +49,20 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
       // app delegate. In sandboxed apps this is expected; unsaved-document
       // dialogs from other frameworks could appear but are unlikely in a
       // typical Flutter app.
-      NSWorkspace.shared.openApplication(at: url, configuration: config) { _, error in
+      NSWorkspace.shared.openApplication(at: url, configuration: config) { application, error in
         DispatchQueue.main.async {
           if let error = error {
             result(
               FlutterError(
                 code: "RESTART_FAILED",
                 message: "Failed to launch new application instance: \(error.localizedDescription)",
+                details: nil
+              ))
+          } else if application == nil {
+            result(
+              FlutterError(
+                code: "RESTART_FAILED",
+                message: "The new application instance did not launch.",
                 details: nil
               ))
           } else {
@@ -68,7 +75,7 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
               result("ok")
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-              NSApp.terminate(nil)
+              NSApp?.terminate(nil)
             }
           }
         }

@@ -80,12 +80,12 @@ await Restart.restartApp(
 
 | Platform | Mechanism | Limitations |
 |----------|-----------|-------------|
-| **Android** | Relaunches the main activity via `PackageManager`. Supports Android TV and Fire TV via leanback launcher fallback. `RestartMode.process` and `forceKill: true` kill the process after launch for a clean cold start. | None |
+| **Android** | Relaunches the main activity via `PackageManager`. Supports Android TV and Fire TV via leanback launcher fallback. `RestartMode.process` and `forceKill: true` kill the process after launch for a clean cold start. | Requires an attached activity and a launchable app entry point. A default restart does not guarantee a new native process. |
 | **iOS** | Recommended: opt-in Flutter engine restart that creates a new `FlutterEngine`, runs Dart again, re-registers plugins, and replaces the root `FlutterViewController` in the same iOS process. Legacy: local notification + `exit(0)` + user tap. | iOS has no public API for automatic full process restart. Engine restart is not a process restart and cannot reset native singleton state. Legacy fallback requires notification permission and user action. |
-| **Web** | Reloads the page using `window.location`. | None |
-| **macOS** | Launches a new instance via `NSWorkspace` and terminates the current process. | Sandboxed (Mac App Store) builds cannot launch new instances of themselves. Returns a failed result in this case. |
-| **Linux** | Replaces the current process via `execv`. Fully automatic. | None |
-| **Windows** | Launches a new instance via `CreateProcess` and terminates the current process. | MSIX-packaged (Microsoft Store) apps cannot be relaunched via `CreateProcess`. |
+| **Web** | Reloads the page using `window.location`. | Persist state first. The browser and host routing determine navigation and reload behavior. |
+| **macOS** | Launches a new instance via `NSWorkspace` and terminates the current process. | Test the signed distribution you ship, including sandbox and termination delegates. Launch failures return `RESTART_FAILED`; a host termination veto can leave the old instance running. |
+| **Linux** | Replaces the current process via `execv`. | The executable must remain accessible. The PID can stay the same because `execv` replaces the process image. Configure argv preservation if needed. |
+| **Windows** | Launches a new instance via `CreateProcess` and terminates the current process. | Uses the desktop process-launch path, not package activation APIs. Test MSIX/Store packaging separately; launch restrictions return `RESTART_FAILED`. |
 
 ## iOS
 
@@ -139,13 +139,15 @@ import restart_app
 
 This follows Flutter's UIScene migration model: the initial engine is registered through `didInitializeImplicitFlutterEngine`, and restarted engines are registered through the `restart_app` callback above.
 
-`restart_app` automatically looks for the active foreground `UIWindowScene` and replaces that scene's key window root `FlutterViewController`. If your app has multiple scenes or a custom native shell, pass a `windowProvider` or `viewControllerInstaller` to `configureEngineRestart` so the plugin targets the correct window.
+`restart_app` prefers the foreground `UIWindowScene` and replaces its key window root `FlutterViewController`. Request restarts while the app is active. If your app has multiple scenes or a custom native shell, pass a `windowProvider` or `viewControllerInstaller` to `configureEngineRestart` so the plugin targets the correct window. A custom `windowProvider` returning `nil` fails with `IOS_NO_ACTIVE_WINDOW`; it does not fall back to another scene. Reconfiguring without a custom installer restores the default root replacement and safety checks.
+
+Complete Flutter's [UIScene migration](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate), including `UIApplicationSceneManifest` in `Info.plist`. Xcode 27 requires the scene lifecycle; the restart callback alone does not migrate the app.
 
 If you implement your own `SceneDelegate`, keep Flutter's scene lifecycle wiring there too: subclass `FlutterSceneDelegate` or conform to `FlutterSceneLifeCycleProvider`, as described in Flutter's [UISceneDelegate migration guide](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate).
 
 #### Classic AppDelegate apps
 
-Use this shape only when your app still registers plugins from `application(_:didFinishLaunchingWithOptions:)`.
+Use this shape only with older toolchains where your app still registers plugins from `application(_:didFinishLaunchingWithOptions:)`. Apps built with Xcode 27 must migrate to UIScene before they can launch.
 
 In `ios/Runner/AppDelegate.swift`:
 
@@ -154,7 +156,7 @@ import UIKit
 import Flutter
 import restart_app
 
-@UIApplicationMain
+@main
 @objc class AppDelegate: FlutterAppDelegate {
   override func application(
     _ application: UIApplication,
@@ -296,6 +298,13 @@ void myIsolateFunction(SendPort sendPort) {
 ## Requirements
 
 **Dart SDK:** `>=3.4.0` · **Flutter:** `>=3.22.0`
+
+These are the plugin's minimum SDK constraints. Your chosen Flutter release,
+other dependencies, and distribution channel can require newer operating systems
+or build tools. For example, Flutter 3.47 raises its own minimums to Android 24,
+iOS 15, and macOS 12. Use an older compatible Flutter SDK for older deployment
+targets; the plugin's native Android 21, iOS 12, and macOS 10.15 minimums remain
+unchanged. See Flutter's [supported platforms](https://docs.flutter.dev/reference/supported-platforms).
 
 | Platform | Minimum |
 |----------|---------|

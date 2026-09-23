@@ -64,15 +64,6 @@ void main() {
     }
   });
 
-  test('example README labels the iOS setup as advanced', () {
-    final exampleReadme = File('example/README.md').readAsStringSync();
-
-    expect(exampleReadme, contains('custom `FlutterEngine` factory'));
-    expect(exampleReadme, contains('Do not copy the example'));
-    expect(exampleReadme, contains('FlutterImplicitEngineDelegate'));
-    expect(exampleReadme, contains('../README.md#ios'));
-  });
-
   test('workflow triggers keep docs work in the docs workflow', () {
     final pagesWorkflow =
         File('.github/workflows/docs-pages.yml').readAsStringSync();

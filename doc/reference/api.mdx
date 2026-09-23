@@ -28,6 +28,10 @@ static Future<RestartCapability> restartCapability()
 ```
 
 Use this when your app should adapt UI or behavior to the current platform.
+Capability flags describe the implementation, not whether the next restart will
+succeed. On web, default reload is supported even though all three restart flags
+are false. Missing registration, platform errors, and malformed capability
+responses return unavailable capabilities rather than throwing a channel error.
 
 ## RestartMode
 
@@ -57,3 +61,18 @@ Use this when your app should adapt UI or behavior to the current platform.
 | `engineRestartConfigured` | Whether Flutter engine restart has been configured by the host app. |
 | `platformDefaultMode` | The behavior used by `RestartMode.platformDefault`. |
 | `reason` | Optional explanation when a capability is unavailable or limited. |
+
+## Results and failures
+
+`success: true` acknowledges acceptance, not a completed relaunch. The old Dart
+isolate may stop before subsequent work finishes. Persist and await required
+state before calling restart, and verify a fresh boot when testing your app.
+
+Platform errors become failed `RestartResult` values. Missing plugin registration
+returns `MISSING_PLUGIN`; an unexpected response returns `UNKNOWN_RESULT`.
+Initialize the Flutter binding before invoking platform channels before `runApp`.
+Prevent duplicate requests while a restart is pending.
+
+On failure, `mode` preserves the requested mode. On success, it reports the
+resolved mode returned by the native implementation. Legacy native responses
+that only return `ok` retain the requested mode.

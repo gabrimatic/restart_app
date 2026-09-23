@@ -53,13 +53,15 @@ import restart_app
 
 This follows Flutter's UIScene migration model: the initial engine is registered through `didInitializeImplicitFlutterEngine`, and restarted engines are registered through the `restart_app` callback above.
 
-`restart_app` automatically looks for the active foreground `UIWindowScene` and replaces that scene's key window root `FlutterViewController`. If your app has multiple scenes or a custom native shell, pass a `windowProvider` or `viewControllerInstaller` to `configureEngineRestart` so the plugin targets the correct window.
+`restart_app` prefers the foreground `UIWindowScene` and replaces its key window root `FlutterViewController`. Request restarts while the app is active. If your app has multiple scenes or a custom native shell, pass a `windowProvider` or `viewControllerInstaller` to `configureEngineRestart` so the plugin targets the correct window. A custom `windowProvider` returning `nil` fails with `IOS_NO_ACTIVE_WINDOW`; it does not fall back to another scene. Reconfiguring without a custom installer restores the default root replacement and safety checks.
+
+Complete Flutter's [UIScene migration](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate), including `UIApplicationSceneManifest` in `Info.plist`. Xcode 27 requires the scene lifecycle; the restart callback alone does not migrate the app.
 
 If you implement your own `SceneDelegate`, keep Flutter's scene lifecycle wiring there too: subclass `FlutterSceneDelegate` or conform to `FlutterSceneLifeCycleProvider`, as described in Flutter's [UISceneDelegate migration guide](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate).
 
 ### Classic AppDelegate apps
 
-Use this setup only when your app still registers plugins from `application(_:didFinishLaunchingWithOptions:)`.
+Use this setup only when your app still registers plugins from `application(_:didFinishLaunchingWithOptions:)`. This legacy lifecycle is for older toolchains. Apps built with Xcode 27 must migrate to UIScene before they can launch.
 
 In `ios/Runner/AppDelegate.swift`:
 
@@ -68,7 +70,7 @@ import UIKit
 import Flutter
 import restart_app
 
-@UIApplicationMain
+@main
 @objc class AppDelegate: FlutterAppDelegate {
   override func application(
     _ application: UIApplication,

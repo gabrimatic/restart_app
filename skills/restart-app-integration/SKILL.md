@@ -25,10 +25,11 @@ description: >-
   Success means accepted and initiated, not proof that the replacement app ran.
   Deferred native failures can occur after success; inspect native logs and
   verify a new launch or engine boot when debugging.
-- Platform errors become failed results. `MissingPluginException` and Flutter
-  binding errors are not caught by this API. Fix plugin registration, rebuild
-  after adding native dependencies, or initialize the Flutter binding when
-  invoking channels before `runApp`; do not silently retry a missing plugin.
+- Platform errors become failed results. Missing registration returns
+  `MISSING_PLUGIN`; capability reports unavailable support with a reason. Fix
+  plugin registration and rebuild after adding native dependencies. Initialize
+  the Flutter binding before using channels before `runApp`; binding errors
+  still require caller setup. Do not silently retry a missing plugin.
 - Route background-worker restart signals to the main isolate using a
   `SendPort`/`ReceivePort`. Request iOS engine restart while the app is active.
 - Prevent repeated taps while a restart is pending. Check `context.mounted`
@@ -85,6 +86,9 @@ Include `<restart_app/restart_app_plugin.h>` and call
 `restart_app_plugin_store_argv(argc, argv)` inside the existing
 `main(int argc, char** argv)`. Keep the runner code. Without this opt-in, Linux
 restarts with only the executable argument.
+
+Relative web destinations resolve against the document base URL, including any
+HTML `base` element. Verify the deployed host serves the destination route.
 
 ## Verification
 
