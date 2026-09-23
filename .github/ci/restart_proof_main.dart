@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:restart_app/restart_app.dart';
 
 final _restartModes = <RestartMode>[
@@ -18,7 +19,7 @@ final _restartModes = <RestartMode>[
 // initialize it back to zero while the file-backed launch counter survives.
 int _volatileDartState = 0;
 
-Future<void> main() async {
+Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final home = Platform.environment['HOME'] ??
@@ -44,15 +45,29 @@ Future<void> main() async {
       ),
     );
 
-    await _runProof(files, state);
+    await _runProof(files, state, arguments);
   } catch (error, stackTrace) {
     _writeFailure(files, state?.runId, error, stackTrace);
   }
 }
 
-Future<void> _runProof(_ProofFiles files, _ProofState state) async {
+Future<void> _runProof(
+  _ProofFiles files,
+  _ProofState state,
+  List<String> arguments,
+) async {
   final cycle = state.cycle;
   final startupVolatileState = _volatileDartState;
+
+  if (state.linuxFailureInFlight) {
+    throw StateError('The Linux failure probe unexpectedly relaunched.');
+  }
+  if (Platform.isLinux || Platform.isWindows) {
+    const expected = 'restart proof "quoted" café 東京';
+    if (arguments.length != 1 || arguments.single != expected) {
+      throw StateError('Original arguments changed on boot $cycle: $arguments');
+    }
+  }
 
   if (state.persistedLaunches != cycle) {
     throw StateError(
@@ -81,6 +96,7 @@ Future<void> _runProof(_ProofFiles files, _ProofState state) async {
     'pid=$pid',
     'startup_volatile=$startupVolatileState',
     'persisted_launches=${state.persistedLaunches}',
+    'arguments_preserved=${Platform.isLinux || Platform.isWindows}',
   ]);
 
   if (cycle == 0) {
@@ -93,6 +109,10 @@ Future<void> _runProof(_ProofFiles files, _ProofState state) async {
         'fullProcessRestart=${capability.fullProcessRestart}, '
         'platformDefaultMode=${capability.platformDefaultMode.name}.',
       );
+    }
+
+    if (Platform.isLinux) {
+      await _verifyLinuxFailureRecovery(files, state);
     }
     _appendResult(
       files,
@@ -144,7 +164,14 @@ Future<void> _runProof(_ProofFiles files, _ProofState state) async {
     // Give the desktop window and channel time to settle before each request.
     await Future<void>.delayed(const Duration(seconds: 1));
     final requestedMode = _restartModes[cycle];
-    final result = await Restart.restartApp(mode: requestedMode);
+    // Send separate native channel calls so a Dart-side guard cannot make this
+    // pass while the native plugin still permits duplicate replacements.
+    final requests = await Future.wait([
+      _requestNativeRestart(requestedMode),
+      _requestNativeRestart(requestedMode),
+    ]);
+    final result = requests.first;
+    final duplicate = requests.last;
     _appendResult(
       files,
       [
@@ -155,6 +182,7 @@ Future<void> _runProof(_ProofFiles files, _ProofState state) async {
         'mode=${result.mode.name}',
         'code=${result.code ?? ''}',
         'message=${result.message ?? ''}',
+        'duplicate_code=${duplicate.code ?? ''}',
       ],
     );
     if (!result.success || result.mode != RestartMode.process) {
@@ -162,6 +190,10 @@ Future<void> _runProof(_ProofFiles files, _ProofState state) async {
         'Restart cycle $cycle failed: success=${result.success}, '
         'mode=${result.mode.name}, code=${result.code}.',
       );
+    }
+    if (duplicate.success || duplicate.code != 'RESTART_ALREADY_IN_PROGRESS') {
+      throw StateError('Concurrent native restart was not rejected: '
+          'success=${duplicate.success}, code=${duplicate.code}.');
     }
     // An accepted request is not proof of a relaunch. If this process keeps
     // running, leave a failure artifact for the external runner.
@@ -188,10 +220,93 @@ Future<void> _runProof(_ProofFiles files, _ProofState state) async {
       'restarts=${_restartModes.length}',
       'state_reset=true',
       'state_persisted=true',
+      'concurrent_requests_rejected=${_restartModes.length}',
+      if (Platform.isLinux || Platform.isWindows) 'arguments_preserved=true',
+      if (Platform.isLinux) 'deferred_failure_recovered=true',
       'last_pid=${state.lastPid ?? ''}',
     ].join(' '),
     flush: true,
   );
+}
+
+Future<RestartResult> _requestNativeRestart(RestartMode mode) async {
+  try {
+    final result = await const MethodChannel('restart')
+        .invokeMethod<dynamic>('restartApp', {
+      'mode': mode.name,
+      'structuredResult': true,
+    });
+    if (result is! Map) {
+      throw StateError('Unexpected native result: $result');
+    }
+    return RestartResult.fromMap(result, fallbackMode: mode);
+  } on PlatformException catch (error) {
+    return RestartResult.error(error, mode);
+  }
+}
+
+Future<void> _verifyLinuxFailureRecovery(
+  _ProofFiles files,
+  _ProofState state,
+) async {
+  final executable = Platform.resolvedExecutable;
+  final permissions = Process.runSync('stat', ['-c', '%a', executable]);
+  if (permissions.exitCode != 0) {
+    throw StateError('Could not read disposable executable permissions.');
+  }
+  final originalMode = permissions.stdout.toString().trim();
+  void chmod(String mode) {
+    if (Process.runSync('chmod', [mode, executable]).exitCode != 0) {
+      throw StateError('Could not change disposable executable permissions.');
+    }
+  }
+
+  try {
+    chmod('a-x');
+    final rejected = await _requestNativeRestart(RestartMode.process);
+    if (rejected.success || rejected.code != 'RESTART_FAILED') {
+      throw StateError('An inaccessible executable passed native preflight.');
+    }
+  } finally {
+    chmod(originalMode);
+  }
+
+  // Keep a complete backup, then replace only the disposable runner with an
+  // executable file of an invalid format. access(X_OK) succeeds, so this must
+  // reach a real execv failure rather than only the deferred access check.
+  state.linuxFailureInFlight = true;
+  state.write(files.stateFile);
+  final backup = File('$executable.restart-proof-backup-${state.runId}');
+  File(executable).copySync(backup.path);
+  try {
+    File(executable).deleteSync();
+    File(executable)
+        .writeAsStringSync('invalid executable format\n', flush: true);
+    chmod(originalMode);
+    final accepted = await _requestNativeRestart(RestartMode.process);
+    if (!accepted.success) {
+      throw StateError('Preflight failure retained the restart guard or the '
+          'execv failure probe did not reach the deferred callback: '
+          '${accepted.code}');
+    }
+    _volatileDartState = 808;
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    final capability = await Restart.restartCapability();
+    if (_volatileDartState != 808 || !capability.fullProcessRestart) {
+      throw StateError('execv failure did not preserve the old application.');
+    }
+  } finally {
+    backup.renameSync(executable);
+    chmod(originalMode);
+  }
+  state.linuxFailureInFlight = false;
+  state.write(files.stateFile);
+  _appendResult(files, [
+    'run_id=${state.runId}',
+    'linux_preflight_failure_recovered=true',
+    'linux_exec_failure_preserved_app=true',
+  ]);
+  // The ordinary restart immediately following this probe must now succeed.
 }
 
 _ProofState _loadOrStartState(_ProofFiles files) {
@@ -283,6 +398,7 @@ class _ProofState {
     required this.lastVolatileState,
     required this.lastPid,
     required this.complete,
+    this.linuxFailureInFlight = false,
   });
 
   factory _ProofState.initial(String runId) => _ProofState(
@@ -327,6 +443,7 @@ class _ProofState {
         lastVolatileState: lastVolatileState as int?,
         lastPid: lastPid as String?,
         complete: complete,
+        linuxFailureInFlight: decoded['linuxFailureInFlight'] == true,
       );
     } on Object {
       return null;
@@ -339,6 +456,7 @@ class _ProofState {
   int? lastVolatileState;
   String? lastPid;
   bool complete;
+  bool linuxFailureInFlight;
 
   void write(File file) {
     file.writeAsStringSync(
@@ -349,6 +467,7 @@ class _ProofState {
         'lastVolatileState': lastVolatileState,
         'lastPid': lastPid,
         'complete': complete,
+        'linuxFailureInFlight': linuxFailureInFlight,
       }),
       flush: true,
     );

@@ -3,16 +3,16 @@ title: Background isolates
 description: Route restart requests through the main isolate.
 ---
 
-`Restart.restartApp()` uses a platform channel and must run on the main isolate.
+Route restart requests through the main isolate, where the app can save state and coordinate its lifecycle.
 
-Calling it from a background isolate throws:
+`Restart.restartApp()` uses a platform channel. Calling it from a background isolate whose binary messenger has not been initialized throws:
 
 ```text
 Bad state: The BackgroundIsolateBinaryMessenger.instance value is invalid
 until BackgroundIsolateBinaryMessenger.ensureInitialized is executed.
 ```
 
-Send a message from the background isolate to the main isolate instead.
+Initializing a background messenger makes platform channels available, but does not coordinate a restart with the UI or pending writes. Send a message to the main isolate.
 
 ```dart
 // Main isolate: listen for restart signals.

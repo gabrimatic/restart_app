@@ -2,6 +2,35 @@ import Flutter
 import UIKit
 import UserNotifications
 
+protocol RestartNotificationService {
+  func authorizationStatus(completion: @escaping (UNAuthorizationStatus) -> Void)
+  func requestAuthorization(completion: @escaping (Bool, Error?) -> Void)
+  func add(_ request: UNNotificationRequest, completion: @escaping (Error?) -> Void)
+  func removePendingRestartNotification()
+}
+
+private struct SystemRestartNotificationService: RestartNotificationService {
+  func authorizationStatus(completion: @escaping (UNAuthorizationStatus) -> Void) {
+    UNUserNotificationCenter.current().getNotificationSettings { settings in
+      completion(settings.authorizationStatus)
+    }
+  }
+
+  func requestAuthorization(completion: @escaping (Bool, Error?) -> Void) {
+    UNUserNotificationCenter.current().requestAuthorization(
+      options: [.alert, .sound], completionHandler: completion)
+  }
+
+  func add(_ request: UNNotificationRequest, completion: @escaping (Error?) -> Void) {
+    UNUserNotificationCenter.current().add(request, withCompletionHandler: completion)
+  }
+
+  func removePendingRestartNotification() {
+    UNUserNotificationCenter.current()
+      .removePendingNotificationRequests(withIdentifiers: ["restart_app"])
+  }
+}
+
 private enum IOSRestartMode: String {
   case platformDefault
   case flutterEngine
@@ -49,7 +78,7 @@ private enum IOSRestartError: Error {
     case .noActiveWindow:
       return "No active UIWindow was found for Flutter engine restart."
     case .restartAlreadyInProgress:
-      return "A Flutter engine restart is already in progress."
+      return "A restart is already in progress."
     case .unsafeRootReplacement:
       return "The active window rootViewController is not a FlutterViewController. "
         + "Provide a custom viewControllerInstaller for add-to-app or custom native shells."
@@ -71,28 +100,51 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
   public typealias AfterRestartHook = (FlutterEngine) -> Void
   public typealias ViewControllerInstaller = (UIWindow, FlutterViewController) -> Void
 
-  private static var engineFactory: EngineFactory?
-  private static var windowProvider: WindowProvider?
-  private static var beforeRestart: RestartHook?
-  private static var afterRestart: AfterRestartHook?
-  private static var viewControllerInstaller: ViewControllerInstaller = { window, viewController in
-    window.rootViewController = viewController
-    window.makeKeyAndVisible()
+  struct EngineRestartConfiguration {
+    var factory: EngineFactory?
+    var windowProvider: WindowProvider?
+    var beforeRestart: RestartHook?
+    var afterRestart: AfterRestartHook?
+    var viewControllerInstaller: ViewControllerInstaller = { window, viewController in
+      window.rootViewController = viewController
+      window.makeKeyAndVisible()
+    }
+    var usesCustomViewControllerInstaller = false
   }
-  private static var usesCustomViewControllerInstaller = false
+
+  static var engineRestartConfiguration = EngineRestartConfiguration()
   private static var retainedEngine: FlutterEngine?
   private static var restartCounter = 0
   private static var isRestarting = false
+  private let notificationService: RestartNotificationService
+
+  public override init() {
+    notificationService = SystemRestartNotificationService()
+    super.init()
+  }
+
+  init(notificationService: RestartNotificationService) {
+    self.notificationService = notificationService
+    super.init()
+  }
 
   public static func register(with registrar: FlutterPluginRegistrar) {
+    register(with: registrar, notificationService: SystemRestartNotificationService())
+  }
+
+  static func register(
+    with registrar: FlutterPluginRegistrar,
+    notificationService: RestartNotificationService
+  ) {
     let channel = FlutterMethodChannel(name: "restart", binaryMessenger: registrar.messenger())
-    let instance = RestartAppPlugin()
+    let instance = RestartAppPlugin(notificationService: notificationService)
     registrar.addMethodCallDelegate(instance, channel: channel)
 
-    // Remove any stale restart notification from a previous launch that
-    // fired after the app was already reopened.
-    UNUserNotificationCenter.current()
-      .removePendingNotificationRequests(withIdentifiers: ["restart_app"])
+    // Another engine can register while the current fallback is scheduling its
+    // notification or waiting to exit. Only clean stale requests between restarts.
+    if !isRestarting {
+      notificationService.removePendingRestartNotification()
+    }
   }
 
   /// Configures the recommended same-process iOS Flutter engine restart.
@@ -133,17 +185,17 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
     afterRestart: AfterRestartHook? = nil,
     viewControllerInstaller: ViewControllerInstaller? = nil
   ) {
-    engineFactory = factory
-    self.windowProvider = windowProvider
-    self.beforeRestart = beforeRestart
-    self.afterRestart = afterRestart
-
-    usesCustomViewControllerInstaller = viewControllerInstaller != nil
-    self.viewControllerInstaller =
-      viewControllerInstaller ?? { window, viewController in
-        window.rootViewController = viewController
-        window.makeKeyAndVisible()
-      }
+    var configuration = EngineRestartConfiguration(
+      factory: factory,
+      windowProvider: windowProvider,
+      beforeRestart: beforeRestart,
+      afterRestart: afterRestart
+    )
+    if let viewControllerInstaller = viewControllerInstaller {
+      configuration.viewControllerInstaller = viewControllerInstaller
+      configuration.usesCustomViewControllerInstaller = true
+    }
+    engineRestartConfiguration = configuration
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -186,7 +238,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
         resolvedMode: .notificationFallback
       )
     case .platformDefault:
-      if Self.engineFactory != nil {
+      if Self.engineRestartConfiguration.factory != nil {
         scheduleEngineRestart(result: result, structuredResult: structuredResult)
       } else {
         result(IOSRestartError.engineRestartNotConfigured.flutterError)
@@ -200,7 +252,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
       return
     }
 
-    guard Self.engineFactory != nil else {
+    guard Self.engineRestartConfiguration.factory != nil else {
       result(IOSRestartError.engineRestartNotConfigured.flutterError)
       return
     }
@@ -215,7 +267,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
       return
     }
 
-    if !Self.usesCustomViewControllerInstaller,
+    if !Self.engineRestartConfiguration.usesCustomViewControllerInstaller,
       !(window.rootViewController is FlutterViewController)
     {
       result(IOSRestartError.unsafeRootReplacement.flutterError)
@@ -241,7 +293,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
       return
     }
 
-    guard let factory = engineFactory else {
+    guard let factory = engineRestartConfiguration.factory else {
       NSLog("[restart_app] Engine restart aborted: engine factory missing.")
       return
     }
@@ -251,7 +303,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
       return
     }
 
-    if !usesCustomViewControllerInstaller,
+    if !engineRestartConfiguration.usesCustomViewControllerInstaller,
       !(window.rootViewController is FlutterViewController)
     {
       NSLog("[restart_app] Engine restart aborted: unsafe root replacement.")
@@ -263,7 +315,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
     let oldEngine = oldFlutterViewController?.engine
 
     do {
-      beforeRestart?()
+      engineRestartConfiguration.beforeRestart?()
       let newEngine = try factory()
       let newFlutterViewController = FlutterViewController(
         engine: newEngine,
@@ -273,8 +325,8 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
 
       oldRootViewController?.dismiss(animated: false)
       retainedEngine = newEngine
-      viewControllerInstaller(window, newFlutterViewController)
-      afterRestart?(newEngine)
+      engineRestartConfiguration.viewControllerInstaller(window, newFlutterViewController)
+      engineRestartConfiguration.afterRestart?(newEngine)
 
       if let oldEngine = oldEngine, oldEngine !== newEngine {
         oldEngine.destroyContext()
@@ -285,7 +337,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
   }
 
   private static func capabilityPayload() -> [String: Any] {
-    let configured = engineFactory != nil
+    let configured = engineRestartConfiguration.factory != nil
 
     return [
       "fullProcessRestart": false,
@@ -303,26 +355,24 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
   }
 
   private static func activeWindow() -> UIWindow? {
-    if let windowProvider = windowProvider {
+    if let windowProvider = engineRestartConfiguration.windowProvider {
       return windowProvider()
     }
 
     if #available(iOS 13.0, *) {
-      let scenes = UIApplication.shared.connectedScenes
+      let application = UIApplication.shared
+      let scenes = application.connectedScenes
         .compactMap { $0 as? UIWindowScene }
-        .sorted {
-          activationRank($0.activationState) > activationRank($1.activationState)
-        }
-
-      for scene in scenes {
-        if let keyWindow = scene.windows.first(where: { $0.isKeyWindow }) {
-          return keyWindow
-        }
-
-        if let visibleWindow = scene.windows.first(where: { !$0.isHidden && $0.alpha > 0 }) {
-          return visibleWindow
-        }
-      }
+        .map { (state: $0.activationState, windows: $0.windows) }
+      let usesSceneLifecycle =
+        !application.connectedScenes.isEmpty
+        || !application.openSessions.isEmpty
+        || Bundle.main.object(forInfoDictionaryKey: "UIApplicationSceneManifest") != nil
+      return selectWindow(
+        sceneWindows: scenes,
+        usesSceneLifecycle: usesSceneLifecycle,
+        legacyWindows: { application.windows }
+      )
     }
 
     return UIApplication.shared.windows.first(where: { $0.isKeyWindow })
@@ -330,19 +380,28 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
   }
 
   @available(iOS 13.0, *)
-  private static func activationRank(_ state: UIScene.ActivationState) -> Int {
-    switch state {
-    case .foregroundActive:
-      return 4
-    case .foregroundInactive:
-      return 3
-    case .background:
-      return 2
-    case .unattached:
-      return 1
-    @unknown default:
-      return 0
+  static func selectWindow(
+    sceneWindows: [(state: UIScene.ActivationState, windows: [UIWindow])],
+    usesSceneLifecycle: Bool,
+    legacyWindows: () -> [UIWindow]
+  ) -> UIWindow? {
+    let activeWindows =
+      sceneWindows
+      .filter { $0.state == .foregroundActive }
+      .flatMap { $0.windows }
+    if let window = activeWindows.first(where: { $0.isKeyWindow })
+      ?? activeWindows.first(where: { !$0.isHidden && $0.alpha > 0 })
+    {
+      return window
     }
+    // UIApplication.windows can include a background scene's windows. It is a
+    // fallback only for hosts that do not use the scene lifecycle at all.
+    if usesSceneLifecycle || !sceneWindows.isEmpty {
+      return nil
+    }
+    let windows = legacyWindows()
+    return windows.first(where: { $0.isKeyWindow })
+      ?? windows.first(where: { !$0.isHidden })
   }
 
   private static func findFlutterViewController(
@@ -401,12 +460,19 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
     structuredResult: Bool,
     resolvedMode: IOSRestartMode
   ) {
+    guard !Self.isRestarting else {
+      result(IOSRestartError.restartAlreadyInProgress.flutterError)
+      return
+    }
+    // Hold the same process-wide guard while settings, permission, scheduling,
+    // and the delayed exit are pending. Each callback returns to the main queue.
+    Self.isRestarting = true
     let title = args["notificationTitle"] as? String ?? "Restart"
     let body = args["notificationBody"] as? String ?? "Tap to reopen the app."
 
-    UNUserNotificationCenter.current().getNotificationSettings { settings in
+    notificationService.authorizationStatus { status in
       DispatchQueue.main.async {
-        switch settings.authorizationStatus {
+        switch status {
         case .authorized, .provisional, .ephemeral:
           self.scheduleAndExit(
             title: title,
@@ -416,10 +482,11 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
             resolvedMode: resolvedMode
           )
         case .notDetermined:
-          UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) {
+          self.notificationService.requestAuthorization {
             granted, error in
             DispatchQueue.main.async {
               if let error = error {
+                Self.isRestarting = false
                 result(
                   FlutterError(
                     code: "AUTHORIZATION_ERROR",
@@ -436,6 +503,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
                   resolvedMode: resolvedMode
                 )
               } else {
+                Self.isRestarting = false
                 result(
                   FlutterError(
                     code: "NOTIFICATION_DENIED",
@@ -447,6 +515,7 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
             }
           }
         default:
+          Self.isRestarting = false
           result(
             FlutterError(
               code: "NOTIFICATION_DENIED",
@@ -474,9 +543,10 @@ public final class RestartAppPlugin: NSObject, FlutterPlugin {
     let request = UNNotificationRequest(
       identifier: "restart_app", content: content, trigger: trigger)
 
-    UNUserNotificationCenter.current().add(request) { error in
+    notificationService.add(request) { error in
       DispatchQueue.main.async {
         if let error = error {
+          Self.isRestarting = false
           result(
             FlutterError(
               code: "NOTIFICATION_FAILED",

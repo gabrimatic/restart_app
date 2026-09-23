@@ -2,6 +2,10 @@ import Cocoa
 import FlutterMacOS
 
 public class RestartAppPlugin: NSObject, FlutterPlugin {
+  // All access occurs on the main queue. Keep this process-wide because a host
+  // can register the plugin with more than one Flutter engine.
+  private static var restartPending = false
+
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "restart", binaryMessenger: registrar.messenger)
     let instance = RestartAppPlugin()
@@ -41,6 +45,17 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
         return
       }
 
+      guard !RestartAppPlugin.restartPending else {
+        result(
+          FlutterError(
+            code: "RESTART_ALREADY_IN_PROGRESS",
+            message: "An application restart is already in progress.",
+            details: nil
+          ))
+        return
+      }
+      RestartAppPlugin.restartPending = true
+
       let url = Bundle.main.bundleURL
       let config = NSWorkspace.OpenConfiguration()
       config.createsNewApplicationInstance = true
@@ -52,6 +67,7 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
       NSWorkspace.shared.openApplication(at: url, configuration: config) { application, error in
         DispatchQueue.main.async {
           if let error = error {
+            RestartAppPlugin.restartPending = false
             result(
               FlutterError(
                 code: "RESTART_FAILED",
@@ -59,6 +75,7 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
                 details: nil
               ))
           } else if application == nil {
+            RestartAppPlugin.restartPending = false
             result(
               FlutterError(
                 code: "RESTART_FAILED",
@@ -75,6 +92,8 @@ public class RestartAppPlugin: NSObject, FlutterPlugin {
               result("ok")
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+              // Retain the guard if the host vetoes termination. A replacement
+              // already exists, so retrying would create another instance.
               NSApp?.terminate(nil)
             }
           }

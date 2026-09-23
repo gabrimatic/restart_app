@@ -72,6 +72,10 @@ Platform errors become failed `RestartResult` values. Missing plugin registratio
 returns `MISSING_PLUGIN`; an unexpected response returns `UNKNOWN_RESULT`.
 Initialize the Flutter binding before invoking platform channels before `runApp`.
 Prevent duplicate requests while a restart is pending.
+Native Android and desktop implementations reject overlapping requests with
+`RESTART_ALREADY_IN_PROGRESS`. iOS uses `IOS_RESTART_ALREADY_IN_PROGRESS` for
+both engine restart and notification fallback. Retry only after a failure has
+been handled or a later intentional user action.
 
 On failure, `mode` preserves the requested mode. On success, it reports the
 resolved mode returned by the native implementation. Legacy native responses

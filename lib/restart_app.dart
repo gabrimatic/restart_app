@@ -169,8 +169,9 @@ class Restart {
   /// this path automatically on Android.
   ///
   /// A successful result means the platform accepted and initiated the
-  /// restart. On Android and iOS the actual swap completes moments after the
-  /// result arrives; failures in that final window are logged natively.
+  /// restart. On Android, iOS, Linux, and Windows, the actual replacement
+  /// completes after the result arrives. A deferred failure is logged natively
+  /// and cannot change the result already returned to Dart.
   static Future<RestartResult> restartApp({
     RestartMode mode = RestartMode.platformDefault,
     String? webOrigin,

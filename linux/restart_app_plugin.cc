@@ -11,6 +11,8 @@
 
 // Stored at registration time so we can pass them to execv on restart.
 static char **g_argv = nullptr;
+// A process can host more than one Flutter engine or plugin registration.
+static gint g_restart_pending = 0;
 
 // Resolves the path to the current executable. Returns TRUE on success and
 // writes a null-terminated path into |buf| of size |buf_size|.
@@ -43,6 +45,7 @@ static gboolean do_restart(gpointer user_data) {
   if (!resolve_exe_path(exe_path, sizeof(exe_path))) {
     g_warning("restart_app: failed to resolve executable path: %s",
               strerror(errno));
+    g_atomic_int_set(&g_restart_pending, 0);
     return G_SOURCE_REMOVE;
   }
 
@@ -50,6 +53,7 @@ static gboolean do_restart(gpointer user_data) {
   if (access(exe_path, X_OK) != 0) {
     g_warning("restart_app: executable not accessible: %s: %s", exe_path,
               strerror(errno));
+    g_atomic_int_set(&g_restart_pending, 0);
     return G_SOURCE_REMOVE;
   }
 
@@ -66,6 +70,7 @@ static gboolean do_restart(gpointer user_data) {
   // loss. The caller can inspect this warning and retry explicitly.
   g_warning("restart_app: execv failed; keeping current process alive: %s",
             strerror(errno));
+  g_atomic_int_set(&g_restart_pending, 0);
   return G_SOURCE_REMOVE;
 }
 
@@ -158,10 +163,21 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
       return;
     }
 
+    if (!g_atomic_int_compare_and_exchange(&g_restart_pending, 0, 1)) {
+      g_autoptr(FlMethodResponse) response =
+          FL_METHOD_RESPONSE(fl_method_error_response_new(
+              "RESTART_ALREADY_IN_PROGRESS",
+              "An application restart is already in progress", nullptr));
+      g_autoptr(GError) error = nullptr;
+      fl_method_call_respond(method_call, response, &error);
+      return;
+    }
+
     // Validate that the executable is resolvable and accessible before
     // responding with success. Once "ok" is sent, failures are silent.
     char exe_path[PATH_MAX];
     if (!resolve_exe_path(exe_path, sizeof(exe_path))) {
+      g_atomic_int_set(&g_restart_pending, 0);
       g_autoptr(FlMethodResponse) err_response =
           FL_METHOD_RESPONSE(fl_method_error_response_new(
               "RESTART_FAILED", "Could not resolve executable path", nullptr));
@@ -170,6 +186,7 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
       return;
     }
     if (access(exe_path, X_OK) != 0) {
+      g_atomic_int_set(&g_restart_pending, 0);
       g_autoptr(FlMethodResponse) err_response =
           FL_METHOD_RESPONSE(fl_method_error_response_new(
               "RESTART_FAILED", "Executable not accessible", nullptr));
@@ -183,14 +200,15 @@ static void method_call_cb(FlMethodChannel *channel, FlMethodCall *method_call,
         restart_success_response(structured_result);
     g_autoptr(GError) error = nullptr;
     if (!fl_method_call_respond(method_call, response, &error)) {
+      g_atomic_int_set(&g_restart_pending, 0);
       g_warning("restart_app: failed to send response: %s",
                 response_error_message(error));
       return;
     }
 
-    // 100ms delay to let the response reach Dart before execv replaces the
-    // process. Matches the delay used on Android, macOS, and Windows.
+    // Allow the channel response to drain before execv replaces the process.
     if (g_timeout_add(100, do_restart, nullptr) == 0) {
+      g_atomic_int_set(&g_restart_pending, 0);
       g_warning("restart_app: failed to schedule deferred restart");
     }
   } else {

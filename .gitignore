@@ -6,6 +6,7 @@
 
 build/
 .build/
+__pycache__/
 
 *.iml
 .idea/

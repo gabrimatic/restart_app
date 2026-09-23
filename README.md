@@ -139,7 +139,7 @@ import restart_app
 
 This follows Flutter's UIScene migration model: the initial engine is registered through `didInitializeImplicitFlutterEngine`, and restarted engines are registered through the `restart_app` callback above.
 
-`restart_app` prefers the foreground `UIWindowScene` and replaces its key window root `FlutterViewController`. Request restarts while the app is active. If your app has multiple scenes or a custom native shell, pass a `windowProvider` or `viewControllerInstaller` to `configureEngineRestart` so the plugin targets the correct window. A custom `windowProvider` returning `nil` fails with `IOS_NO_ACTIVE_WINDOW`; it does not fall back to another scene. Reconfiguring without a custom installer restores the default root replacement and safety checks.
+`restart_app` selects a visible window from a foreground-active `UIWindowScene` and replaces its root `FlutterViewController`, preferring the key window. It rejects automatic selection when no active scene is available. Request restarts while the app is active. If your app has multiple scenes or a custom native shell, pass a `windowProvider` or `viewControllerInstaller` to `configureEngineRestart` so the plugin targets the correct window. A custom `windowProvider` returning `nil` fails with `IOS_NO_ACTIVE_WINDOW`; it does not fall back to another scene. Reconfiguring without a custom installer restores the default root replacement and safety checks.
 
 Complete Flutter's [UIScene migration](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate), including `UIApplicationSceneManifest` in `Info.plist`. Xcode 27 requires the scene lifecycle; the restart callback alone does not migrate the app.
 
@@ -267,14 +267,14 @@ Most Flutter apps don't rely on command-line arguments, so this step is optional
 
 ## Background isolates
 
-`Restart.restartApp()` uses a platform channel and must run on the **main isolate**. Calling it from a background isolate throws:
+Route restart requests through the **main isolate**, where the app can save state and coordinate its lifecycle. `Restart.restartApp()` uses a platform channel. Calling it from a background isolate whose binary messenger has not been initialized throws:
 
 ```
 Bad state: The BackgroundIsolateBinaryMessenger.instance value is invalid
 until BackgroundIsolateBinaryMessenger.ensureInitialized is executed.
 ```
 
-Send a message from your isolate to the main isolate instead:
+Initializing a background messenger makes platform channels available, but does not coordinate a restart with the UI or pending writes. Send a message to the main isolate:
 
 ```dart
 // Main isolate: listen for restart signals

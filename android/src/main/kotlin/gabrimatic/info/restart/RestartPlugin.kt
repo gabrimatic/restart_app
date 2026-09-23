@@ -13,6 +13,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.lang.ref.WeakReference
 
 /** Android implementation for the `restart` platform channel. */
 class RestartPlugin :
@@ -21,6 +22,26 @@ class RestartPlugin :
     ActivityAware {
     private lateinit var channel: MethodChannel
     private var activity: Activity? = null
+
+    private class PendingRestart(
+        activity: Activity,
+        val forceKill: Boolean,
+    ) {
+        val originatingActivity = WeakReference(activity)
+        var launchDispatched = false
+    }
+
+    private companion object {
+        // Platform-channel handlers and ActivityAware callbacks run on the main looper.
+        // This state is shared by every plugin instance, including other Flutter engines.
+        var pendingRestart: PendingRestart? = null
+
+        fun clearPendingRestart(request: PendingRestart) {
+            if (pendingRestart === request) {
+                pendingRestart = null
+            }
+        }
+    }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "restart")
@@ -34,9 +55,9 @@ class RestartPlugin :
      * deliver it across the platform channel. Without this delay, the task teardown can rip
      * down the engine mid-delivery, causing a FlutterJNI detached error.
      *
-     * When forceKill is true, the process is terminated immediately after the new activity
-     * launches, ensuring a clean cold restart with no stale native resources. A longer delay
-     * gives the new activity time to initialize before the current process exits.
+     * When forceKill is true, the longer delay lets the old engine deliver the response.
+     * startActivity then requests the replacement launch and the current process exits
+     * immediately, ensuring a cold restart with no stale native resources.
      */
     override fun onMethodCall(
         call: MethodCall,
@@ -70,6 +91,14 @@ class RestartPlugin :
 
                 val forceKill = mode == "process" || (call.argument<Boolean>("forceKill") ?: false)
                 val resolvedMode = if (forceKill) "process" else "platformDefault"
+                if (pendingRestart != null) {
+                    result.error(
+                        "RESTART_ALREADY_IN_PROGRESS",
+                        "A restart is already in progress.",
+                        null,
+                    )
+                    return
+                }
                 val currentActivity = activity
 
                 if (currentActivity == null) {
@@ -77,18 +106,63 @@ class RestartPlugin :
                     return
                 }
 
-                val pm = currentActivity.packageManager
-                val pkg = currentActivity.packageName
+                val request = PendingRestart(currentActivity, forceKill)
+                pendingRestart = request
 
-                // Try the standard launcher intent first, then fall back to the leanback
-                // launcher used by Android TV and Fire TV devices (API 21+).
-                var intent = pm.getLaunchIntentForPackage(pkg)
-                if (intent == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    intent = pm.getLeanbackLaunchIntentForPackage(pkg)
-                }
+                val intent =
+                    try {
+                        val pm = currentActivity.packageManager
+                        val pkg = currentActivity.packageName
+                        // Android TV and Fire TV may expose only a leanback launcher.
+                        val launcher =
+                            pm.getLaunchIntentForPackage(pkg)
+                                ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                    pm.getLeanbackLaunchIntentForPackage(pkg)
+                                } else {
+                                    null
+                                }
+                        launcher?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                    } catch (e: Exception) {
+                        clearPendingRestart(request)
+                        result.error("RESTART_FAILED", "Unable to find launch activity: ${e.message}", null)
+                        return
+                    }
 
                 if (intent == null) {
-                    result.error("RESTART_FAILED", "No launchable activity found for $pkg", null)
+                    clearPendingRestart(request)
+                    result.error("RESTART_FAILED", "No launchable activity found", null)
+                    return
+                }
+
+                // Delay the destructive operations so the platform channel result can be delivered
+                // to the Dart side before the Flutter engine is torn down.
+                val delay = if (forceKill) 300L else 100L
+                val queued =
+                    try {
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            try {
+                                // Keep the guard until a replacement activity attaches. Releasing
+                                // here would let another engine restart during task teardown.
+                                request.launchDispatched = true
+                                // CLEAR_TASK already finishes the previous task's activities.
+                                currentActivity.startActivity(intent)
+                                if (forceKill) {
+                                    Runtime.getRuntime().exit(0)
+                                }
+                            } catch (e: Exception) {
+                                clearPendingRestart(request)
+                                Log.e("RestartPlugin", "Restart failed: ${e.message}", e)
+                            }
+                        }, delay)
+                    } catch (e: Exception) {
+                        clearPendingRestart(request)
+                        result.error("RESTART_FAILED", "Unable to schedule restart: ${e.message}", null)
+                        return
+                    }
+
+                if (!queued) {
+                    clearPendingRestart(request)
+                    result.error("RESTART_FAILED", "Unable to schedule restart", null)
                     return
                 }
 
@@ -102,25 +176,6 @@ class RestartPlugin :
                 } else {
                     result.success("ok")
                 }
-
-                // Delay the destructive operations so the platform channel result can be delivered
-                // to the Dart side before the Flutter engine is torn down.
-                val delay = if (forceKill) 300L else 100L
-                Handler(Looper.getMainLooper()).postDelayed({
-                    try {
-                        // FLAG_ACTIVITY_CLEAR_TASK already finishes every activity in
-                        // the launcher task, so no explicit finishAffinity() is needed;
-                        // calling it again makes ActivityTaskManager log a
-                        // "Duplicate finish request" for the already-finishing activity.
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                        currentActivity.startActivity(intent)
-                        if (forceKill) {
-                            Runtime.getRuntime().exit(0)
-                        }
-                    } catch (e: Exception) {
-                        Log.e("RestartPlugin", "Restart failed: ${e.message}", e)
-                    }
-                }, delay)
             }
 
             else -> {
@@ -135,6 +190,14 @@ class RestartPlugin :
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        val pending = pendingRestart
+        if (pending != null &&
+            pending.launchDispatched &&
+            !pending.forceKill &&
+            pending.originatingActivity.get() !== binding.activity
+        ) {
+            clearPendingRestart(pending)
+        }
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
@@ -142,7 +205,7 @@ class RestartPlugin :
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
-        activity = binding.activity
+        onAttachedToActivity(binding)
     }
 
     override fun onDetachedFromActivity() {

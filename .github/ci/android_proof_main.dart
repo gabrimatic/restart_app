@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:restart_app/restart_app.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -31,10 +32,13 @@ Future<void> _probe() async {
   final previousBoot = prefs.getString('boot');
   final previousPid = prefs.getInt('pid');
   final history = prefs.getStringList('history') ?? [];
+  if (cycle > 0 && prefs.getInt('concurrencyVerified') != cycle) {
+    throw StateError('Concurrent restart requests were not safely rejected');
+  }
   if (cycle > 0 && (previousBoot == _boot || _dirty != 0)) {
     throw StateError('Dart state survived restart');
   }
-  if (cycle > 0 && (cycle - 1) % 3 != 0 && previousPid == pid) {
+  if (cycle > 0 && (cycle - 1) % 4 >= 2 && previousPid == pid) {
     throw StateError('Process restart retained PID $pid');
   }
   history.add('cycle=$cycle boot=$_boot pid=$pid dirty=$_dirty');
@@ -65,14 +69,33 @@ Future<void> _probe() async {
     throw StateError('Could not save restart state');
   }
   _dirty = 137;
+  // Two consecutive activity restarts prove that the process-wide guard is
+  // released by the replacement activity, including without a process exit.
   final mode =
-      cycle % 3 == 1 ? RestartMode.process : RestartMode.platformDefault;
-  final forceKill = cycle % 3 == 2;
+      cycle % 4 == 2 ? RestartMode.process : RestartMode.platformDefault;
+  final forceKill = cycle % 4 == 3;
   _show('Restarting cycle=$cycle mode=${mode.name} forceKill=$forceKill\n'
       'boot=$_boot pid=$pid dirty=$_dirty\n${jsonEncode(history)}');
   await Future<void>.delayed(const Duration(seconds: 1));
-  final result = await Restart.restartApp(mode: mode, forceKill: forceKill);
+  final accepted = Restart.restartApp(mode: mode, forceKill: forceKill);
+  const channel = MethodChannel('restart');
+  final duplicates = List.generate(8, (index) async {
+    try {
+      await channel.invokeMethod<dynamic>('restartApp', {
+        'mode': index.isEven ? 'platformDefault' : 'process',
+        'structuredResult': index.isEven,
+      });
+      throw StateError('Concurrent native restart $index was accepted');
+    } on PlatformException catch (error) {
+      if (error.code != 'RESTART_ALREADY_IN_PROGRESS') rethrow;
+    }
+  });
+  final result = await accepted;
   if (!result.success) throw StateError('${result.code}: ${result.message}');
+  await Future.wait(duplicates);
+  if (!await prefs.setInt('concurrencyVerified', cycle + 1)) {
+    throw StateError('Could not save concurrent restart verification');
+  }
   Timer(const Duration(seconds: 20),
       () => _show('FAIL accepted restart did not complete'));
 }

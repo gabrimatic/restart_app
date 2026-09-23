@@ -6,6 +6,8 @@ set(PLUGIN_NAME "restart_app_plugin")
 
 add_library(${PLUGIN_NAME} SHARED
   "restart_app_plugin.cpp"
+  "restart_app_relaunch.cpp"
+  "restart_app_relaunch.h"
   "restart_app_plugin.h"
   "restart_app_plugin_c_api.cpp"
   "include/restart_app/restart_app_plugin_c_api.h"

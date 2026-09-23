@@ -68,10 +68,20 @@ android {
     defaultConfig {
         minSdk 21
     }
+
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
 }
 
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    // Keep API 21 coverage, which Robolectric 4.16 and newer no longer support.
+    testImplementation 'org.robolectric:robolectric:4.15'
 }

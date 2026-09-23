@@ -63,13 +63,17 @@ Future<void> saveAndRestart(
 Handle save errors in the caller's normal error UI. Disable its restart action
 while this operation is pending.
 
+An overlapping native request fails with `RESTART_ALREADY_IN_PROGRESS` on
+Android and desktop, or `IOS_RESTART_ALREADY_IN_PROGRESS` on iOS. Handle it as
+a pending restart, not as a reason to loop or switch modes.
+
 ## Platform decisions
 
 | Target | Supported modes | Integration details |
 | --- | --- | --- |
 | Android | `platformDefault`, `process` | Default relaunches the launcher activity. `process` or `forceKill: true` additionally terminates the old process. A foreground activity and launch intent are required; TV uses a leanback fallback. |
 | iOS | Configured `platformDefault`, `flutterEngine`; explicit `notificationFallback` | Default requires native engine setup. Read the bundled `restart-app-ios-engine-restart` skill for host integration. Full process restart is unsupported. |
-| Web | `platformDefault` only | Null or empty `webOrigin` reloads the current URL and keeps its route. `#/home` changes the hash and reloads. Other nonempty values use location replacement; relative URLs resolve against the current page. Do not request `process`. |
+| Web | `platformDefault` only | Null or empty `webOrigin` reloads the current URL and keeps its route. `#/home` changes the hash and reloads. Other nonempty values use location replacement; relative URLs resolve against the document base URL. Do not request `process`. |
 | macOS | `platformDefault`, `process` | Resolves to `process`. Uses `NSWorkspace` to launch a new instance, then terminates the old one. Check actual distribution and sandbox constraints. |
 | Linux | `platformDefault`, `process` | Resolves to `process`. Uses `execv`; the PID can stay the same. Preserve arguments as described below when needed. |
 | Windows | `platformDefault`, `process` | Resolves to `process`. Uses `CreateProcessW` and retains the command line. MSIX/Store packaging can prevent relaunch. |
