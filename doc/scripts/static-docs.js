@@ -6,6 +6,7 @@
   const themeKey = `mintlify-docs-theme:${base}`;
   const themeButtons = [...document.querySelectorAll('button[aria-label*="theme" i]')];
   function applyTheme(theme) {
+    document.documentElement.dataset.themePreference = theme;
     document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.classList.toggle('light', theme === 'light');
     document.documentElement.style.colorScheme = theme;

@@ -19,6 +19,17 @@ static Future<RestartResult> restartApp({
 
 By default, this uses the best supported behavior for the current platform. Pass `mode` when you want a specific restart path, such as `RestartMode.process`, `RestartMode.flutterEngine`, or `RestartMode.notificationFallback`.
 
+### Web destinations
+
+`webOrigin` controls the web destination:
+
+- Null or empty reloads the current URL and preserves its route.
+- A hash-only value such as `#/home` updates the fragment and reloads. Changing the fragment adds a history entry.
+- A full or relative URL targeting the same document replaces the current history entry and reloads, including when only the fragment changes.
+- A different document uses `window.location.replace`, so navigation replaces the current history entry.
+
+Relative URLs resolve against `document.baseURI`, including any HTML `base` element. Persist required state before calling; code after the request may not finish before the document unloads.
+
 ## Restart.restartCapability
 
 Returns the restart behavior available on the current platform.

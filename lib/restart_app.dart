@@ -155,10 +155,13 @@ class Restart {
   /// [RestartMode.process], [RestartMode.flutterEngine], or
   /// [RestartMode.notificationFallback].
   ///
-  /// The [webOrigin] parameter is web-only. If null, the web implementation
-  /// reloads the current page and preserves the current route. Pass a hash
-  /// path such as `#/home` when your web app uses hash routing, or a full URL
-  /// to replace the current location entirely.
+  /// The [webOrigin] parameter is web-only. Null or empty reloads the current
+  /// URL. A hash-only value such as `#/home` updates the fragment and reloads,
+  /// adding a history entry when the fragment changes. Other values resolve
+  /// against `document.baseURI`, including any HTML `base` element. A full or
+  /// relative URL targeting the same document replaces the current history
+  /// entry and reloads, even when only the fragment changes. A different
+  /// document uses location replacement without adding a history entry.
   ///
   /// The [notificationTitle] and [notificationBody] parameters customize
   /// [RestartMode.notificationFallback]. They do not make

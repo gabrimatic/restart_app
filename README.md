@@ -1,10 +1,10 @@
 # restart_app
 
-[![pub package](https://img.shields.io/pub/v/restart_app.svg)](https://pub.dev/packages/restart_app) [![likes](https://img.shields.io/pub/likes/restart_app)](https://pub.dev/packages/restart_app/score) [![popularity](https://img.shields.io/pub/popularity/restart_app)](https://pub.dev/packages/restart_app/score) [![pub points](https://img.shields.io/pub/points/restart_app)](https://pub.dev/packages/restart_app/score)
+[![pub package](https://img.shields.io/pub/v/restart_app.svg)](https://pub.dev/packages/restart_app) [![likes](https://img.shields.io/pub/likes/restart_app)](https://pub.dev/packages/restart_app/score) [![pub points](https://img.shields.io/pub/points/restart_app)](https://pub.dev/packages/restart_app/score)
 
 Restart or relaunch your Flutter app from Dart with one call.
 
-Each platform uses the safest supported restart path available to Flutter apps. See the [published docs](https://gabrimatic.github.io/restart_app/) for guides, reference, and deployment details. The [platform behavior guide](https://gabrimatic.github.io/restart_app/product/platform-behavior/) covers the exact native mechanism on each target.
+The plugin uses platform-specific restart or reload behavior. See the [published docs](https://gabrimatic.github.io/restart_app/) for guides, reference, and deployment details. The [platform behavior guide](https://gabrimatic.github.io/restart_app/product/platform-behavior/) covers the exact native mechanism on each target.
 
 ## Quick start
 
@@ -12,10 +12,12 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  restart_app: ^1.9.2
+  restart_app: ^1.10.0
 ```
 
-Import and call:
+On iOS, complete the [host setup](#configure-flutter-engine-restart) first. The default call cannot restart an unconfigured iOS app.
+
+Persist required state and await pending writes before restarting. Import the package, then call it from an async app action on the main isolate:
 
 ```dart
 import 'package:restart_app/restart_app.dart';
@@ -54,7 +56,7 @@ for requirements, supported workflows, and installation details.
 
 ## Customization
 
-Default behavior works for normal app restart flows. Pass options only when your app needs a specific platform behavior.
+Use the default mode after completing the setup for your platform. Pass options only when your app needs a specific platform behavior.
 
 ```dart
 await Restart.restartApp(
@@ -71,7 +73,7 @@ await Restart.restartApp(
 | Parameter | Platform | Description |
 |-----------|----------|-------------|
 | `mode` | All | Requested restart behavior: `platformDefault`, `flutterEngine`, `process`, or `notificationFallback`. |
-| `webOrigin` | Web | Custom URL for the reload. When null, the current page reloads and keeps its route. Supports hash strategy (e.g. `'#/home'`). |
+| `webOrigin` | Web | Null or empty reloads the current URL. Hash-only values such as `#/home` update the hash and reload. Full or relative URLs targeting the same document replace the current history entry and reload; other destinations use location replacement. Relative URLs resolve against `document.baseURI`. |
 | `notificationTitle` | iOS | Title of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Restart`. |
 | `notificationBody` | iOS | Body of the local notification shown only when `mode` is `notificationFallback`. Defaults to `Tap to reopen the app.` |
 | `forceKill` | Android | When `true`, fully terminates the process after launching the new activity. Defaults to `false`. `RestartMode.process` enables this path automatically on Android. |
@@ -252,7 +254,7 @@ If you see `"requires a provisioning profile with the Push Notifications feature
 
 ### Command-line arguments
 
-By default, the restarted process launches without the original command-line arguments. To preserve them, call `restart_app_plugin_store_argv` in your `linux/main.cc` before running the Flutter engine:
+By default, the restarted process launches without the original command-line arguments. To preserve them, add the header and call below to your existing `linux/runner/main.cc` (`linux/main.cc` in older Flutter projects). Keep the rest of `main()` unchanged:
 
 ```cpp
 #include <restart_app/restart_app_plugin.h>
@@ -261,6 +263,12 @@ int main(int argc, char** argv) {
   restart_app_plugin_store_argv(argc, argv);
   // ... rest of main()
 }
+```
+
+Flutter's generated plugin rules link the runner to `restart_app_plugin`. If your runner has custom plugin wiring, ensure that link exists in `linux/CMakeLists.txt`, after `include(flutter/generated_plugins.cmake)`:
+
+```cmake
+target_link_libraries(${BINARY_NAME} PRIVATE restart_app_plugin)
 ```
 
 Most Flutter apps don't rely on command-line arguments, so this step is optional.
@@ -274,26 +282,53 @@ Bad state: The BackgroundIsolateBinaryMessenger.instance value is invalid
 until BackgroundIsolateBinaryMessenger.ensureInitialized is executed.
 ```
 
-Initializing a background messenger makes platform channels available, but does not coordinate a restart with the UI or pending writes. Send a message to the main isolate:
+Initializing a background messenger makes platform channels available, but does not coordinate a restart with the UI or pending writes. Send a message to the main isolate.
+
+Call this function from an async app action while the app is active. Supply your persistence function and an error callback. A save failure prevents the restart; worker errors, early exit, and a one-minute timeout also report a failure. Close the port and stop the worker when the operation ends:
 
 ```dart
-// Main isolate: listen for restart signals
-final receivePort = ReceivePort();
-receivePort.listen((message) {
-  if (message == 'restart') {
-    Restart.restartApp();
+import 'dart:isolate';
+
+import 'package:restart_app/restart_app.dart';
+
+Future<void> runWorkerAndRestart({
+  required Future<void> Function() savePendingChanges,
+  required void Function(String message) reportFailure,
+}) async {
+  final requests = ReceivePort();
+  Isolate? worker;
+  try {
+    worker = await Isolate.spawn(
+      workerMain,
+      requests.sendPort,
+      onError: requests.sendPort,
+      onExit: requests.sendPort,
+    );
+    final message = await requests.first.timeout(const Duration(minutes: 1));
+    if (message != 'restart') {
+      throw StateError('Worker stopped without a restart request: $message');
+    }
+
+    await savePendingChanges();
+    final result = await Restart.restartApp();
+    if (!result.success) {
+      reportFailure(result.message ?? result.code ?? 'Restart could not start.');
+    }
+  } catch (error) {
+    reportFailure('Restart flow failed: $error');
+  } finally {
+    requests.close();
+    worker?.kill(priority: Isolate.immediate);
   }
-});
+}
 
-// Spawn the isolate with the SendPort
-await Isolate.spawn(myIsolateFunction, receivePort.sendPort);
-
-// Background isolate: signal instead of calling restartApp() directly
-void myIsolateFunction(SendPort sendPort) {
-  // ... your background work ...
-  sendPort.send('restart');
+void workerMain(SendPort mainPort) {
+  // Finish this worker's work before sending the request.
+  mainPort.send('restart');
 }
 ```
+
+If the error callback updates a widget, check that it is still mounted. Keep the restart action disabled until this function completes.
 
 ## Requirements
 
@@ -318,4 +353,4 @@ The Android module builds on Android Gradle Plugin 8 and 9. It applies the Kotli
 
 Created by [Soroush Yousefpour](https://gabrimatic.info)
 
-<a href="https://www.buymeacoffee.com/gabrimatic" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Book" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+<a href="https://www.buymeacoffee.com/gabrimatic"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy me a coffee" width="170" height="37"></a>

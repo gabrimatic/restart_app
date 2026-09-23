@@ -41,11 +41,15 @@ async function* walk(dir) {
 
 function rewrite(text) {
   return text.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/((?:href|src|content|action)=")\/(?!\/)([^"\s]*)/g,
-      (match, prefix, path) => path === basePath.slice(1) || path.startsWith(`${basePath.slice(1)}/`)
-        ? match : `${prefix}${basePath}/${path}`)
-    .replace(/url\(\/(?!\/)([^)]*)\)/g, (match, path) =>
-      path.startsWith(`${basePath.slice(1)}/`) ? match : `url(${basePath}/${path})`);
+    .replace(/(\s(?:href|src|content|action)\s*=\s*)(["'])(\/(?!\/)[^"']*)\2/gi,
+      (match, prefix, quote, path) => path === basePath || path.startsWith(`${basePath}/`)
+        ? match : `${prefix}${quote}${basePath}${path}${quote}`)
+    .replace(/url\(\s*(?:"(\/(?!\/)[^"]*)"|'(\/(?!\/)[^']*)'|(\/(?!\/)[^)\s]*))\s*\)/gi,
+      (match, doubleQuoted, singleQuoted, unquoted) => {
+        const path = doubleQuoted ?? singleQuoted ?? unquoted;
+        return path === basePath || path.startsWith(`${basePath}/`)
+          ? match : match.replace(path, () => `${basePath}${path}`);
+      });
 }
 
 function plainText(html) {
@@ -54,8 +58,12 @@ function plainText(html) {
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi, (_, value) => {
-      if (value.startsWith('#x')) return String.fromCodePoint(parseInt(value.slice(2), 16));
-      if (value.startsWith('#')) return String.fromCodePoint(parseInt(value.slice(1), 10));
+      if (value.startsWith('#')) {
+        const hexadecimal = value.slice(0, 2).toLowerCase() === '#x';
+        const point = parseInt(value.slice(hexadecimal ? 2 : 1), hexadecimal ? 16 : 10);
+        return point > 0 && point <= 0x10ffff && !(point >= 0xd800 && point <= 0xdfff)
+          ? String.fromCodePoint(point) : '\uFFFD';
+      }
       return entities[value.toLowerCase()];
     }).replace(/\s+/g, ' ').trim();
 }

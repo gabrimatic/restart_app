@@ -1,4 +1,5 @@
 .github/
+test/docs_site_test.dart
 build/
 example/build/
 example/.dart_tool/

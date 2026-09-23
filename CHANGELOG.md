@@ -1,3 +1,18 @@
+## 1.10.0
+
+* Reload the web document when an absolute or relative restart URL changes only its fragment, including identical URLs and fragment removal
+* Preserve replacement history and HTML base URL resolution for web restart destinations
+* Require a mounted WebView JavaScript handshake and previous-boot file and SQLite data in the example's restart checks
+* Put iOS host configuration and awaited state persistence beside the first restart examples; provide complete background-isolate coordination with cleanup and failure handling
+* Correct Linux runner paths and distinguish standard plugin linking from custom-runner setup
+* Remove the retired popularity badge, correct the funding image's accessible label, and verify image content as well as transport status
+* Fix quoted HTML and CSS resource paths and uppercase or invalid numeric entities in the static documentation export
+* Restore the documentation theme icon, use the configured blue palette in both themes, and check all exported pages and interactive controls in desktop and mobile browsers
+* Include package ignore rules and dependency lockfile changes in CI; restrict documentation deployment to the master branch
+* Add candidate-package origin checks so release consumers and installed skills can be verified against the exact packaged files
+* Add sustained native restart checks with lifecycle transitions, Android activity recreation, iOS engine and view lifetime checks, and desktop process cleanup
+* Exercise repeated JavaScript and WebAssembly restarts across URL forms, browser history, background tabs, and opaque-origin frames with parent-held state
+
 ## 1.9.2
 
 Released September 23, 2026.

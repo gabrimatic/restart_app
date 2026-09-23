@@ -2,7 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
 // ignore: avoid_web_libraries_in_flutter
-import 'package:web/web.dart' as web show window;
+import 'package:web/web.dart' as web show URL, document, window;
 
 /// Web implementation for the `restart` platform channel.
 class RestartWeb {
@@ -62,8 +62,9 @@ class RestartWeb {
   /// The `webOrigin` parameter is optional and defaults to null, which reloads
   /// the current page and preserves the current route. Pass a hash path such
   /// as `#/home` to move to that hash route and reload, or a full URL to
-  /// replace the current location entirely. Relative URLs resolve against the
-  /// document's base URL, including any HTML `base` element.
+  /// replace the current location entirely. A destination that differs only
+  /// by its fragment still reloads the document. Relative URLs resolve against
+  /// the document's base URL, including any HTML `base` element.
   String restart(String? webOrigin) {
     try {
       final origin =
@@ -72,7 +73,18 @@ class RestartWeb {
         web.window.location.hash = origin;
         web.window.location.reload();
       } else if (origin != null) {
-        web.window.location.replace(origin);
+        final destination = web.URL(origin, web.document.baseURI);
+        final currentDocument = web.URL(web.window.location.href)..hash = '';
+        final destinationDocument = web.URL(destination.href)..hash = '';
+        if (destinationDocument.href == currentDocument.href) {
+          // A fragment-only location.replace() keeps the existing Dart app
+          // alive. Update the replacement history entry before reloading so
+          // adding, changing, or removing a fragment uses the intended URL.
+          web.window.history.replaceState(null, '', destination.href);
+          web.window.location.reload();
+        } else {
+          web.window.location.replace(destination.href);
+        }
       } else {
         // Reload the current URL so the active route survives the restart.
         // This also works in sandboxed iframes, where window.origin is the

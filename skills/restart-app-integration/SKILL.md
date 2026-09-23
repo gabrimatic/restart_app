@@ -73,7 +73,7 @@ a pending restart, not as a reason to loop or switch modes.
 | --- | --- | --- |
 | Android | `platformDefault`, `process` | Default relaunches the launcher activity. `process` or `forceKill: true` additionally terminates the old process. A foreground activity and launch intent are required; TV uses a leanback fallback. |
 | iOS | Configured `platformDefault`, `flutterEngine`; explicit `notificationFallback` | Default requires native engine setup. Read the bundled `restart-app-ios-engine-restart` skill for host integration. Full process restart is unsupported. |
-| Web | `platformDefault` only | Null or empty `webOrigin` reloads the current URL and keeps its route. `#/home` changes the hash and reloads. Other nonempty values use location replacement; relative URLs resolve against the document base URL. Do not request `process`. |
+| Web | `platformDefault` only | Null or empty `webOrigin` reloads the current URL. `#/home` changes the hash and reloads. Full or relative URLs targeting the same document replace the current history entry and reload; different documents use location replacement. Do not request `process`. |
 | macOS | `platformDefault`, `process` | Resolves to `process`. Uses `NSWorkspace` to launch a new instance, then terminates the old one. Check actual distribution and sandbox constraints. |
 | Linux | `platformDefault`, `process` | Resolves to `process`. Uses `execv`; the PID can stay the same. Preserve arguments as described below when needed. |
 | Windows | `platformDefault`, `process` | Resolves to `process`. Uses `CreateProcessW` and retains the command line. MSIX/Store packaging can prevent relaunch. |
@@ -83,16 +83,28 @@ is Android-only. Notification title/body only customize the explicit iOS
 notification fallback; they do not enable it. Never substitute notification
 fallback automatically after iOS engine setup fails.
 
-For Linux apps that need their original arguments, add the following call to
-existing `linux/main.cc`, before starting the Flutter engine:
+For Linux apps that need their original arguments, update the existing
+`linux/runner/main.cc` (`linux/main.cc` in older Flutter projects), before
+starting the Flutter engine:
 
 Include `<restart_app/restart_app_plugin.h>` and call
 `restart_app_plugin_store_argv(argc, argv)` inside the existing
-`main(int argc, char** argv)`. Keep the runner code. Without this opt-in, Linux
-restarts with only the executable argument.
+`main(int argc, char** argv)`. Keep the runner code. Flutter's generated plugin
+rules link the runner to `restart_app_plugin`. If the runner has custom plugin
+wiring, ensure this link exists in `linux/CMakeLists.txt`, after
+`include(flutter/generated_plugins.cmake)`:
 
-Relative web destinations resolve against the document base URL, including any
-HTML `base` element. Verify the deployed host serves the destination route.
+```cmake
+target_link_libraries(${BINARY_NAME} PRIVATE restart_app_plugin)
+```
+
+Without this opt-in, Linux restarts with only the executable argument.
+
+Relative web destinations resolve against `document.baseURI`, including any
+HTML `base` element. Hash-only input adds a history entry when the fragment
+changes; full or relative URL input replaces the current history entry, even
+when only its fragment changes. Verify the deployed host serves the destination
+route.
 
 ## Verification
 

@@ -40,3 +40,63 @@ test('export preserves external URLs, installs controls and indexes actual page 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('export rewrites quoted CSS resources and preserves URL syntax', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'restart-docs-css-'));
+  const css = `a{mask:url("/icons/check.svg")}
+b{background:url('/images/space (1).png')}
+@font-face{src:URL( "/font.woff2" )}
+c{background:url("//cdn.example/image.png")}
+d{background:url('https://example.org/image.png')}
+e{background:url('./relative.png')}
+f{background:url('/restart_app')}`;
+  try {
+    await writeFile(join(directory, 'style.css'), css);
+    execFileSync(process.execPath, [prepare, directory, '/restart_app']);
+    const expected = css.replace('/icons/', '/restart_app/icons/')
+      .replace('/images/', '/restart_app/images/')
+      .replace('/font.woff2', '/restart_app/font.woff2');
+    assert.equal(await readFile(join(directory, 'style.css'), 'utf8'), expected);
+    execFileSync(process.execPath, [prepare, directory, '/restart_app']);
+    assert.equal(await readFile(join(directory, 'style.css'), 'utf8'), expected);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('export rewrites quoted HTML attributes without changing external or prefixed URLs', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'restart-docs-html-'));
+  const html = `<html><body><a HREF = "/quickstart">Start</a>
+<img src='/icons/check.svg'><form action = '/submit'></form>
+<meta CONTENT='/social.png'><a href='//example.org/path'>External</a>
+<a href = "https://example.org/path">External</a>
+<a href='/restart_app/reference'>Ready</a><span data-src='/unrelated'>Data</span>
+</body></html>`;
+  try {
+    await writeFile(join(directory, 'index.html'), html);
+    execFileSync(process.execPath, [prepare, directory, '/restart_app']);
+    const output = await readFile(join(directory, 'index.html'), 'utf8');
+    for (const value of ['HREF = "/restart_app/quickstart"', "src='/restart_app/icons/check.svg'",
+      "action = '/restart_app/submit'", "CONTENT='/restart_app/social.png'",
+      "href='//example.org/path'", 'href = "https://example.org/path"',
+      "href='/restart_app/reference'", "data-src='/unrelated'"]) assert.ok(output.includes(value), value);
+    execFileSync(process.execPath, [prepare, directory, '/restart_app']);
+    assert.equal(await readFile(join(directory, 'index.html'), 'utf8'), output);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('search indexing decodes uppercase hex and replaces invalid Unicode entities', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'restart-docs-entities-'));
+  try {
+    await writeFile(join(directory, 'index.html'),
+      '<html><body><main><h1>&#X1F600; &#x41; &#66; &AMP; &#0; &#x110000; &#xD800;</h1></main></body></html>');
+    execFileSync(process.execPath, [prepare, directory, '/restart_app']);
+    assert.deepEqual(JSON.parse(await readFile(join(directory, 'search-index.json'), 'utf8')), [{
+      title: '😀 A B & � � �', text: '😀 A B & � � �', url: '/restart_app/',
+    }]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

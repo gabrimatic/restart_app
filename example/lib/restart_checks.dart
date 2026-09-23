@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -45,6 +46,24 @@ void resetRestartCheckDirtyState() {
   restartCheckDirtyState = 0;
 }
 
+Future<int> recordRestartCheckLaunch(String bootToken) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
+  final stored = prefs.getString('restartLaunchState');
+  final previous = stored == null
+      ? <String, dynamic>{'count': prefs.getInt('launchCount') ?? 0}
+      : jsonDecode(stored) as Map<String, dynamic>;
+  final count =
+      (previous['count'] as int) + (previous['boot'] == bootToken ? 0 : 1);
+  if (!await prefs.setString(
+    'restartLaunchState',
+    jsonEncode({'boot': bootToken, 'count': count}),
+  )) {
+    throw StateError('Could not save the launch verification marker.');
+  }
+  return count;
+}
+
 class RestartCheckResult {
   const RestartCheckResult(this.name, this.ok, this.detail);
 
@@ -68,6 +87,8 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
   var _restartAttempts = 0;
   var _running = true;
   List<RestartCheckResult> _results = const [];
+  Completer<PlatformProbe>? _webViewResult;
+  var _previewGeneration = 0;
 
   @override
   void initState() {
@@ -81,9 +102,12 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
   }
 
   Future<void> _runChecks() async {
+    final webViewResult = Completer<PlatformProbe>();
     setState(() {
       _running = true;
       _summary = 'Running checks...';
+      _webViewResult = webViewResult;
+      _previewGeneration += 1;
     });
 
     final results = <RestartCheckResult>[];
@@ -109,11 +133,8 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
 
     await probe('shared preferences', () async {
       final prefs = await SharedPreferences.getInstance();
-      final launchCount = (prefs.getInt('launchCount') ?? 0) + 1;
+      final launchCount = await recordRestartCheckLaunch(restartCheckBootToken);
       final restartAttempts = prefs.getInt('restartAttempts') ?? 0;
-      if (!await prefs.setInt('launchCount', launchCount)) {
-        throw StateError('Could not save the launch count.');
-      }
 
       if (!mounted) {
         return 'launch=$launchCount, restartAttempts=$restartAttempts';
@@ -172,6 +193,14 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
       );
     }
 
+    if (supportsWebViewProbe) {
+      await probe('webview', () async {
+        final result = await webViewResult.future;
+        if (!result.ok) throw StateError(result.detail);
+        return result.detail;
+      });
+    }
+
     await probe('dart clean state', () async {
       if (restartCheckDirtyState != 0) {
         throw StateError(
@@ -196,6 +225,7 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final webViewResult = _webViewResult;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -214,7 +244,14 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
             Text('launches: $_launchCount'),
             Text('restart attempts: $_restartAttempts'),
             const SizedBox(height: 12),
-            const _PackagePreview(),
+            _PackagePreview(
+              key: ValueKey(_previewGeneration),
+              onWebViewResult: (result) {
+                if (webViewResult != null && !webViewResult.isCompleted) {
+                  webViewResult.complete(result);
+                }
+              },
+            ),
             const SizedBox(height: 12),
             FilledButton.tonal(
               onPressed: _running ? null : _runChecks,
@@ -237,7 +274,9 @@ class _RestartChecksPanelState extends State<RestartChecksPanel> {
 }
 
 class _PackagePreview extends StatelessWidget {
-  const _PackagePreview();
+  const _PackagePreview({super.key, required this.onWebViewResult});
+
+  final ValueChanged<PlatformProbe> onWebViewResult;
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +300,13 @@ class _PackagePreview extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        const SizedBox(height: 84, child: PlatformPreview()),
+        SizedBox(
+          height: 84,
+          child: PlatformPreview(
+            bootToken: restartCheckBootToken,
+            onResult: onWebViewResult,
+          ),
+        ),
       ],
     );
   }

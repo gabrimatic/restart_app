@@ -9,7 +9,7 @@ Add the package:
 
 ```yaml
 dependencies:
-  restart_app: ^1.9.2
+  restart_app: ^1.10.0
 ```
 
 Then fetch dependencies:
@@ -39,7 +39,9 @@ The Android module builds on Android Gradle Plugin 8 and 9. It applies the Kotli
 
 ## Restart the app
 
-Import the package and call `Restart.restartApp()`:
+On iOS, complete the [host setup](/product/ios-engine-restart/) first. The default call cannot restart an unconfigured iOS app.
+
+Persist required state and await pending writes before restarting. Import the package, then call it from an async app action on the main isolate:
 
 ```dart
 import 'package:restart_app/restart_app.dart';
@@ -61,7 +63,7 @@ if (!result.success) {
 
 ## Customize behavior
 
-Default behavior works for normal app restart flows. Pass options only when your app needs a specific platform behavior.
+Use the default mode after completing the setup for your platform. Pass options only when your app needs a specific platform behavior.
 
 ```dart
 await Restart.restartApp(

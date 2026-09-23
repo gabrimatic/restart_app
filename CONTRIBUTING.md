@@ -46,7 +46,7 @@ All platforms communicate over a single `MethodChannel` named `restart`.
 
 - **Android**: Uses `ActivityAware` to get a reference to the current activity. It relaunches the main activity with package-manager launcher intents. The `forceKill` option terminates the old process after the new activity starts.
 - **iOS**: iOS has no public API for automatic full process restart. The recommended path is opt-in Flutter engine restart: the host app provides plugin registration, the plugin creates a fresh `FlutterEngine`, runs Dart again, replaces the root `FlutterViewController`, and destroys the old engine context. The notification + `exit(0)` flow remains only as a legacy fallback.
-- **Web**: Uses `window.location.replace` or `window.location.hash` for hash-based routing.
+- **Web**: Reloads the current URL by default. A hash-only destination updates `window.location.hash` and reloads. Other destinations resolve against `document.baseURI`: same-document URLs replace the current history entry and reload; different documents use `window.location.replace`.
 - **macOS**: Uses `NSWorkspace` to launch a new app instance, then terminates the current process.
 - **Linux**: Uses `execv` to replace the current process.
 - **Windows**: Uses `CreateProcessW` to launch a new instance, then exits the current process.

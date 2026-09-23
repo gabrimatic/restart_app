@@ -14,21 +14,48 @@ until BackgroundIsolateBinaryMessenger.ensureInitialized is executed.
 
 Initializing a background messenger makes platform channels available, but does not coordinate a restart with the UI or pending writes. Send a message to the main isolate.
 
+Call this function from an async app action while the app is active. Supply your persistence function and an error callback. A save failure prevents the restart; worker errors, early exit, and a one-minute timeout also report a failure. Close the port and stop the worker when the operation ends:
+
 ```dart
-// Main isolate: listen for restart signals.
-final receivePort = ReceivePort();
-receivePort.listen((message) {
-  if (message == 'restart') {
-    Restart.restartApp();
+import 'dart:isolate';
+
+import 'package:restart_app/restart_app.dart';
+
+Future<void> runWorkerAndRestart({
+  required Future<void> Function() savePendingChanges,
+  required void Function(String message) reportFailure,
+}) async {
+  final requests = ReceivePort();
+  Isolate? worker;
+  try {
+    worker = await Isolate.spawn(
+      workerMain,
+      requests.sendPort,
+      onError: requests.sendPort,
+      onExit: requests.sendPort,
+    );
+    final message = await requests.first.timeout(const Duration(minutes: 1));
+    if (message != 'restart') {
+      throw StateError('Worker stopped without a restart request: $message');
+    }
+
+    await savePendingChanges();
+    final result = await Restart.restartApp();
+    if (!result.success) {
+      reportFailure(result.message ?? result.code ?? 'Restart could not start.');
+    }
+  } catch (error) {
+    reportFailure('Restart flow failed: $error');
+  } finally {
+    requests.close();
+    worker?.kill(priority: Isolate.immediate);
   }
-});
+}
 
-// Spawn the isolate with the SendPort.
-await Isolate.spawn(myIsolateFunction, receivePort.sendPort);
-
-// Background isolate: signal instead of calling restartApp() directly.
-void myIsolateFunction(SendPort sendPort) {
-  // ... your background work ...
-  sendPort.send('restart');
+void workerMain(SendPort mainPort) {
+  // Finish this worker's work before sending the request.
+  mainPort.send('restart');
 }
 ```
+
+If the error callback updates a widget, check that it is still mounted. Keep the restart action disabled until this function completes.
