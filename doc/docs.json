@@ -13,7 +13,8 @@
         "group": "Start",
         "pages": [
           "index",
-          "quickstart"
+          "quickstart",
+          "agent-skills"
         ]
       },
       {

@@ -12,7 +12,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  restart_app: ^1.9.1
+  restart_app: ^1.9.2
 ```
 
 Import and call:
@@ -34,6 +34,23 @@ if (!result.success) {
 ```
 
 `Restart.restartApp()` is the restart API. It returns a `RestartResult` with `success`, the resolved `mode`, and platform error details when the restart cannot be started.
+
+## Agent skills
+
+This package includes agent skills for restart integration and iOS engine setup.
+Install them from your Flutter project with Dart 3.12 or later after fetching dependencies:
+
+```bash
+flutter pub get
+dart run skills@ get restart_app
+```
+
+Select the skills when prompted, or append `--all` to install both. Run the
+command again after upgrading `restart_app` to update the instructions alongside
+your resolved package version. The CLI is a development tool, not an app dependency.
+
+See the [agent skills guide](https://gabrimatic.github.io/restart_app/agent-skills/)
+for requirements, supported workflows, and installation details.
 
 ## Customization
 

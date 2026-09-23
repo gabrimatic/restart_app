@@ -67,3 +67,23 @@ Use the [bug report template](https://github.com/gabrimatic/restart_app/issues/n
 ## Vulnerability Reporting
 
 See [SECURITY.md](SECURITY.md). Do **not** open public issues for security vulnerabilities.
+
+## Package skills
+
+Consumer instructions live under `skills/`, with one `SKILL.md` per
+`restart-app-*` directory. Keep the frontmatter name equal to the directory name.
+Bundle conditional reference material inside that skill so installed copies
+remain self-contained. Update the relevant instructions when changing an API or
+platform contract.
+
+Verify discovery, installation, and Dart examples with a current stable Flutter
+SDK and Python 3:
+
+```bash
+python3 .github/ci/check_skills.py
+```
+
+This uses a temporary consumer with a path dependency, installs the skills with
+the Dart Skills CLI, compares the installed files, and analyzes all Dart code
+blocks as standalone libraries. Keep those examples complete and compilable.
+`dart pub publish --dry-run` must also include the skill files.
