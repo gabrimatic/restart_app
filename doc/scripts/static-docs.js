@@ -105,7 +105,7 @@
       `${page.title} ${page.text}`.toLocaleLowerCase().includes(term)))
       .sort((a, b) => Number(terms.every(term => b.title.toLocaleLowerCase().includes(term)))
         - Number(terms.every(term => a.title.toLocaleLowerCase().includes(term))));
-    status.textContent = matches.length ? `${matches.length} matching pages` : 'No matching pages. Try fewer words.';
+    status.textContent = matches.length ? `${matches.length} matching ${matches.length === 1 ? 'page' : 'pages'}` : 'No matching pages. Try fewer words.';
     for (const page of matches) {
       const link = document.createElement('a');
       link.href = page.url;
