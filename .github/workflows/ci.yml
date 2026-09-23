@@ -322,6 +322,9 @@ jobs:
             "$PWD" "$RUNNER_TEMP/restart-web-package" --platform web
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: .github/ci
+      - name: Verify owned browser cleanup
+        run: node --test visibility_browser.test.mjs
+        working-directory: .github/ci
       - name: Install isolated test browsers
         working-directory: .github/ci
         env:

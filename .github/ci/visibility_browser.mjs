@@ -7,6 +7,60 @@ import path from 'node:path';
 const delay = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds));
 const running = process => process.pid !== undefined && process.exitCode === null && process.signalCode === null;
 
+async function completesWithin(promise, milliseconds) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise.then(() => true),
+      new Promise(resolve => { timer = setTimeout(() => resolve(false), milliseconds); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function createOwnedBrowserCleanup(process, profile, {
+  browserCloseTimeoutMs = 5000,
+  gracefulTimeoutMs = 5000,
+  forcedTimeoutMs = 5000,
+  removeProfile = rm,
+} = {}) {
+  // Observe close immediately after spawn because exit can precede stdio
+  // closure. Chromium descendants may still finish filesystem cleanup;
+  // bounded removal retries below cover that transient activity.
+  let closed = false;
+  let processError;
+  const close = new Promise(resolve => process.once('close', () => {
+    closed = true;
+    resolve();
+  }));
+  process.on('error', error => { processError = error; });
+  let cleanup;
+  return browser => cleanup ??= (async () => {
+    let browserError;
+    if (browser) {
+      try {
+        // Promise.race observes a late rejection even if the deadline wins.
+        if (!await completesWithin(Promise.resolve().then(() => browser.close()), browserCloseTimeoutMs)) {
+          browserError = new Error(`Timed out closing the browser connection; profile retained: ${profile}`);
+        }
+      } catch (error) {
+        browserError = error;
+      }
+    }
+    if (!closed && running(process)) process.kill('SIGTERM');
+    if (!closed && !await completesWithin(close, gracefulTimeoutMs)) {
+      if (running(process)) process.kill('SIGKILL');
+      if (!await completesWithin(close, forcedTimeoutMs)) {
+        throw new Error(`Owned test browser did not close process and stdio: ${process.pid}; profile retained: ${profile}`,
+          { cause: processError ?? browserError });
+      }
+    }
+    if (browserError) throw browserError;
+    await removeProfile(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  })();
+}
+
 export async function launchVisibilityBrowser() {
   const profile = await mkdtemp(path.join(tmpdir(), 'restart_app_visibility_'));
   const process = spawn(chromium.executablePath(), [
@@ -17,6 +71,7 @@ export async function launchVisibilityBrowser() {
     ...(platform() === 'linux' ? ['--use-gl=angle', '--use-angle=swiftshader'] : []),
     '--no-sandbox', 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const cleanup = createOwnedBrowserCleanup(process, profile);
   let stderr = '';
   let startupError;
   process.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-16_384); });
@@ -24,16 +79,7 @@ export async function launchVisibilityBrowser() {
   let browser;
 
   async function dispose() {
-    try {
-      if (browser) await browser.close();
-    } finally {
-      if (running(process)) process.kill('SIGTERM');
-      for (let attempt = 0; attempt < 100 && running(process); attempt++) await delay(50);
-      if (running(process)) process.kill('SIGKILL');
-      for (let attempt = 0; attempt < 100 && running(process); attempt++) await delay(50);
-      if (running(process)) throw new Error(`Owned test browser did not stop: ${process.pid}`);
-      await rm(profile, { recursive: true, force: true });
-    }
+    await cleanup(browser);
   }
 
   try {
@@ -55,7 +101,11 @@ export async function launchVisibilityBrowser() {
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { noDefaults: true });
     return { browser, dispose };
   } catch (error) {
-    await dispose();
+    try {
+      await dispose();
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'Test browser startup and cleanup both failed');
+    }
     throw error;
   }
 }

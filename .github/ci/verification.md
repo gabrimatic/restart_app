@@ -273,6 +273,7 @@ From `.github/ci/`, install and run the browser tests:
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
+node --test visibility_browser.test.mjs
 npx playwright install chromium webkit
 npm run test:web
 ```
