@@ -8,13 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:restart_app/restart_app.dart';
 
-final _restartModes = <RestartMode>[
-  for (var cycle = 0; cycle < 5; cycle++) ...[
-    RestartMode.platformDefault,
-    RestartMode.process,
-  ],
-];
-
 // This is deliberately in-memory state. A desktop process relaunch must
 // initialize it back to zero while the file-backed launch counter survives.
 int _volatileDartState = 0;
@@ -160,10 +153,11 @@ Future<void> _runProof(
   state.lastPid = '$pid';
   state.write(files.stateFile);
 
-  if (cycle < _restartModes.length) {
+  if (cycle < state.requestedCycles) {
     // Give the desktop window and channel time to settle before each request.
     await Future<void>.delayed(const Duration(seconds: 1));
-    final requestedMode = _restartModes[cycle];
+    final requestedMode =
+        cycle.isEven ? RestartMode.platformDefault : RestartMode.process;
     // Send separate native channel calls so a Dart-side guard cannot make this
     // pass while the native plugin still permits duplicate replacements.
     final requests = await Future.wait([
@@ -217,10 +211,11 @@ Future<void> _runProof(
       'RESTARTED_OK',
       'run_id=${state.runId}',
       'launches=${state.persistedLaunches}',
-      'restarts=${_restartModes.length}',
+      'requested_restarts=${state.requestedCycles}',
+      'restarts=${state.requestedCycles}',
       'state_reset=true',
       'state_persisted=true',
-      'concurrent_requests_rejected=${_restartModes.length}',
+      'concurrent_requests_rejected=${state.requestedCycles}',
       if (Platform.isLinux || Platform.isWindows) 'arguments_preserved=true',
       if (Platform.isLinux) 'deferred_failure_recovered=true',
       'last_pid=${state.lastPid ?? ''}',
@@ -322,7 +317,14 @@ _ProofState _loadOrStartState(_ProofFiles files) {
 
   final runId = requestedRunId ?? _freshRunId();
   files.clearRunArtifacts();
-  final state = _ProofState.initial(runId);
+  final count = Platform.environment['RESTART_APP_PROOF_CYCLES'] ?? '30';
+  final requestedCycles = int.tryParse(count);
+  if (requestedCycles == null ||
+      requestedCycles < 1 ||
+      requestedCycles > 1000) {
+    throw StateError('RESTART_APP_PROOF_CYCLES must be between 1 and 1000.');
+  }
+  final state = _ProofState.initial(runId, requestedCycles);
   state.write(files.stateFile);
   files.runIdFile.writeAsStringSync(runId, flush: true);
   return state;
@@ -393,6 +395,7 @@ class _ProofFiles {
 class _ProofState {
   _ProofState({
     required this.runId,
+    required this.requestedCycles,
     required this.cycle,
     required this.persistedLaunches,
     required this.lastVolatileState,
@@ -401,8 +404,9 @@ class _ProofState {
     this.linuxFailureInFlight = false,
   });
 
-  factory _ProofState.initial(String runId) => _ProofState(
+  factory _ProofState.initial(String runId, int requestedCycles) => _ProofState(
         runId: runId,
+        requestedCycles: requestedCycles,
         cycle: 0,
         persistedLaunches: 0,
         lastVolatileState: null,
@@ -420,6 +424,7 @@ class _ProofState {
         return null;
       }
       final runId = decoded['runId'];
+      final requestedCycles = decoded['requestedCycles'];
       final cycle = decoded['cycle'];
       final persistedLaunches = decoded['persistedLaunches'];
       final lastVolatileState = decoded['lastVolatileState'];
@@ -427,8 +432,12 @@ class _ProofState {
       final complete = decoded['complete'];
       if (runId is! String ||
           runId.isEmpty ||
+          requestedCycles is! int ||
+          requestedCycles < 1 ||
+          requestedCycles > 1000 ||
           cycle is! int ||
           cycle < 0 ||
+          cycle > requestedCycles + 1 ||
           persistedLaunches is! int ||
           persistedLaunches < 0 ||
           (lastVolatileState != null && lastVolatileState is! int) ||
@@ -438,6 +447,7 @@ class _ProofState {
       }
       return _ProofState(
         runId: runId,
+        requestedCycles: requestedCycles,
         cycle: cycle,
         persistedLaunches: persistedLaunches,
         lastVolatileState: lastVolatileState as int?,
@@ -451,6 +461,9 @@ class _ProofState {
   }
 
   final String runId;
+  // NSWorkspace may drop the initial process environment on macOS. Keep the
+  // externally requested count in durable state for every replacement boot.
+  final int requestedCycles;
   int cycle;
   int persistedLaunches;
   int? lastVolatileState;
@@ -462,6 +475,7 @@ class _ProofState {
     file.writeAsStringSync(
       jsonEncode({
         'runId': runId,
+        'requestedCycles': requestedCycles,
         'cycle': cycle,
         'persistedLaunches': persistedLaunches,
         'lastVolatileState': lastVolatileState,

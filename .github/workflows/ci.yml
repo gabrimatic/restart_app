@@ -6,8 +6,10 @@ on:
     paths:
       - '.github/workflows/ci.yml'
       - '.github/ci/**'
+      - '.pubignore'
       - 'analysis_options.yaml'
       - 'pubspec.yaml'
+      - 'pubspec.lock'
       - 'skills/**'
       - 'lib/**'
       - 'android/**'
@@ -24,8 +26,10 @@ on:
     paths:
       - '.github/workflows/ci.yml'
       - '.github/ci/**'
+      - '.pubignore'
       - 'analysis_options.yaml'
       - 'pubspec.yaml'
+      - 'pubspec.lock'
       - 'skills/**'
       - 'lib/**'
       - 'android/**'
@@ -40,6 +44,33 @@ on:
   workflow_dispatch:
 
 jobs:
+  candidate-package:
+    name: Stage exact publication candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          cache: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: flutter pub get
+      - run: flutter pub publish --dry-run
+      - name: Create and inventory the pub-selected archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/candidate-artifact"
+          dart pub publish --to-archive="$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          python3 .github/ci/package_archive.py \
+            "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
+            --manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: candidate-package
+          path: ${{ runner.temp }}/candidate-artifact/
+          if-no-files-found: error
+
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
@@ -77,6 +108,10 @@ jobs:
       - run: flutter test
       - run: flutter test --platform chrome test/restart_web_test.dart
       - run: cd example && flutter pub get && flutter test
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python3 -m pip install -r .github/ci/requirements-readme-images.txt
       - run: python3 -B -m unittest discover -s .github/ci -p 'test_*.py'
 
   compatibility:
@@ -217,6 +252,120 @@ jobs:
           cache: true
       - run: cd example && flutter pub get && flutter build web
 
+  web-runtime:
+    name: Browser restart proof (${{ matrix.mode }})
+    needs: candidate-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [js, wasm]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          cache: true
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: .github/ci/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          name: candidate-package
+          path: ${{ runner.temp }}/candidate-artifact
+      - name: Prepare the archive consumer
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+        run: |
+          python3 .github/ci/package_archive.py \
+            "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
+            --extract "$RUNNER_TEMP/restart-web-package" \
+            --manifest "$RUNNER_TEMP/restart-web-$RESTART_WEB_MODE/candidate-manifest.json" \
+            --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
+          python3 - <<'PY'
+          import json, os, shutil
+          from pathlib import Path
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          package = temporary / 'restart-web-package'
+          consumer = temporary / 'restart-web-consumer'
+          shutil.copytree(package / 'example', consumer)
+          pubspec = consumer / 'pubspec.yaml'
+          source = pubspec.read_text()
+          dependency = '  restart_app:\n    path: ../\n'
+          if source.count(dependency) != 1:
+              raise RuntimeError('Expected one example restart_app path dependency')
+          pubspec.write_text(source.replace(dependency, '  restart_app:\n    path: ' + json.dumps(str(package)) + '\n'))
+          manifest = json.loads((temporary / ('restart-web-' + os.environ['RESTART_WEB_MODE']) / 'candidate-manifest.json').read_text())
+          with open(os.environ['GITHUB_ENV'], 'a') as environment:
+              environment.write('RESTART_PACKAGE_SHA256=' + manifest['archiveSha256'] + '\n')
+          PY
+      - name: Build the real browser probe
+        working-directory: ${{ runner.temp }}/restart-web-consumer
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+        run: |
+          flutter pub get
+          python3 "$GITHUB_WORKSPACE/.github/ci/candidate_package.py" \
+            "$PWD" "$RUNNER_TEMP/restart-web-package" --platform web
+          if [ "$RESTART_WEB_MODE" = wasm ]; then
+            flutter build web -t lib/web_restart_probe.dart --wasm --pwa-strategy=none
+          else
+            flutter build web -t lib/web_restart_probe.dart --pwa-strategy=none
+          fi
+          python3 "$GITHUB_WORKSPACE/.github/ci/candidate_package.py" \
+            "$PWD" "$RUNNER_TEMP/restart-web-package" --platform web
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: .github/ci
+      - name: Install isolated test browsers
+        working-directory: .github/ci
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+        run: |
+          if [ "$RESTART_WEB_MODE" = js ]; then
+            npx playwright install --with-deps chromium webkit
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Verify reloads, routes, history and opaque frames
+        run: npm run test:web
+        working-directory: .github/ci
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+          RESTART_WEB_BUILD: ${{ runner.temp }}/restart-web-consumer/build/web
+          RESTART_WEB_RESULTS: ${{ runner.temp }}/restart-web-${{ matrix.mode }}
+      - name: Verify hidden-tab reload and visible return
+        run: xvfb-run -a npx playwright test --config playwright.config.mjs --workers 1 --repeat-each 1 --grep 'tab switch'
+        working-directory: .github/ci
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+          RESTART_WEB_HEADED: '1'
+          RESTART_WEB_BUILD: ${{ runner.temp }}/restart-web-consumer/build/web
+          RESTART_WEB_RESULTS: ${{ runner.temp }}/restart-web-${{ matrix.mode }}-visibility
+      - name: Verify the package stayed unchanged
+        if: always()
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+        run: |
+          python3 .github/ci/package_archive.py \
+            "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
+            --manifest "$RUNNER_TEMP/restart-web-$RESTART_WEB_MODE/candidate-after-runtime.json" \
+            --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json" \
+            --verify-dir "$RUNNER_TEMP/restart-web-package"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: restart-web-${{ matrix.mode }}
+          path: |
+            ${{ runner.temp }}/restart-web-${{ matrix.mode }}
+            ${{ runner.temp }}/restart-web-${{ matrix.mode }}-visibility
+          if-no-files-found: warn
+
   build-linux:
     name: Build Linux example
     runs-on: ubuntu-latest
@@ -342,69 +491,178 @@ jobs:
 
   run-linux:
     name: Linux restart proof
+    needs: candidate-package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: candidate-package
+          path: ${{ runner.temp }}/candidate-artifact
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.5'
           cache: true
+      - name: Extract and verify the shared candidate
+        run: >-
+          python3 .github/ci/package_archive.py "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          --extract "$RUNNER_TEMP/restart_app_candidate"
+          --manifest "$RUNNER_TEMP/desktop-proof/candidate-extracted.json"
+          --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
       - run: sudo apt-get update
       - run: sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev xvfb
-      - run: flutter create --platforms=linux --project-name restart_proof /tmp/restart_proof
-      - run: cd /tmp/restart_proof && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
-      - run: cp "$GITHUB_WORKSPACE/.github/ci/restart_proof_main.dart" /tmp/restart_proof/lib/main.dart
-      - run: python3 .github/ci/prepare_linux_proof.py /tmp/restart_proof
-      - run: cd /tmp/restart_proof && flutter build linux --release
+      - run: flutter create --platforms=linux --project-name restart_proof "$RUNNER_TEMP/restart_proof"
+      - run: flutter pub add restart_app --path "$RUNNER_TEMP/restart_app_candidate"
+        working-directory: ${{ runner.temp }}/restart_proof
+      - run: cp "$GITHUB_WORKSPACE/.github/ci/restart_proof_main.dart" "$RUNNER_TEMP/restart_proof/lib/main.dart"
+      - run: python3 .github/ci/prepare_linux_proof.py "$RUNNER_TEMP/restart_proof"
+      - name: Verify the package origin before build
+        run: >-
+          python3 .github/ci/candidate_package.py "$RUNNER_TEMP/restart_proof"
+          "$RUNNER_TEMP/restart_app_candidate" --platform linux
+          > "$RUNNER_TEMP/desktop-proof/origin-before-build.txt"
+      - run: flutter build linux --release
+        working-directory: ${{ runner.temp }}/restart_proof
+      - name: Verify the package origin after build
+        run: >-
+          python3 .github/ci/candidate_package.py "$RUNNER_TEMP/restart_proof"
+          "$RUNNER_TEMP/restart_app_candidate" --platform linux
+          > "$RUNNER_TEMP/desktop-proof/origin-after-build.txt"
+      - name: Verify candidate bytes after build
+        run: >-
+          python3 .github/ci/package_archive.py "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          --verify-dir "$RUNNER_TEMP/restart_app_candidate"
+          --manifest "$RUNNER_TEMP/desktop-proof/candidate-after-build.json"
+          --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
       - name: Stress native restarts and verify fresh state
-        run: xvfb-run -a python3 .github/ci/run_desktop_proof.py /tmp/restart_proof/build/linux/x64/release/bundle/restart_proof
-      - uses: actions/upload-artifact@v4
+        run: >-
+          xvfb-run -a python3 .github/ci/run_desktop_proof.py
+          "$RUNNER_TEMP/restart_proof/build/linux/x64/release/bundle/restart_proof"
+          --cycles 30 --output "$RUNNER_TEMP/desktop-proof/desktop-proof.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: restart-proof-linux
-          path: desktop-proof.json
+          path: ${{ runner.temp }}/desktop-proof/
+          if-no-files-found: warn
 
   run-windows:
     name: Windows restart proof
+    needs: candidate-package
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: candidate-package
+          path: ${{ runner.temp }}/candidate-artifact
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.5'
           cache: true
-      - run: flutter create --platforms=windows --project-name restart_proof "$env:RUNNER_TEMP\restart_proof"
-      - run: flutter pub add restart_app --path "$env:GITHUB_WORKSPACE"
-        working-directory: ${{ runner.temp }}\restart_proof
-      - run: Copy-Item "$env:GITHUB_WORKSPACE\.github\ci\restart_proof_main.dart" "lib\main.dart" -Force
-        working-directory: ${{ runner.temp }}\restart_proof
+      - name: Extract and verify the shared candidate
+        run: >-
+          python .github/ci/package_archive.py "$env:RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          --extract "$env:RUNNER_TEMP/restart_app_candidate"
+          --manifest "$env:RUNNER_TEMP/desktop-proof/candidate-extracted.json"
+          --expected-manifest "$env:RUNNER_TEMP/candidate-artifact/candidate-payload.json"
+      - run: flutter create --platforms=windows --project-name restart_proof "$env:RUNNER_TEMP/restart_proof"
+      - run: flutter pub add restart_app --path "$env:RUNNER_TEMP/restart_app_candidate"
+        working-directory: ${{ runner.temp }}/restart_proof
+      - run: Copy-Item "$env:GITHUB_WORKSPACE/.github/ci/restart_proof_main.dart" "lib/main.dart" -Force
+        working-directory: ${{ runner.temp }}/restart_proof
+      - name: Verify the package origin before build
+        run: >-
+          python .github/ci/candidate_package.py "$env:RUNNER_TEMP/restart_proof"
+          "$env:RUNNER_TEMP/restart_app_candidate" --platform windows
+          > "$env:RUNNER_TEMP/desktop-proof/origin-before-build.txt"
       - run: flutter build windows --release
-        working-directory: ${{ runner.temp }}\restart_proof
+        working-directory: ${{ runner.temp }}/restart_proof
+      - name: Verify the package origin after build
+        run: >-
+          python .github/ci/candidate_package.py "$env:RUNNER_TEMP/restart_proof"
+          "$env:RUNNER_TEMP/restart_app_candidate" --platform windows
+          > "$env:RUNNER_TEMP/desktop-proof/origin-after-build.txt"
+      - name: Verify candidate bytes after build
+        run: >-
+          python .github/ci/package_archive.py "$env:RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          --verify-dir "$env:RUNNER_TEMP/restart_app_candidate"
+          --manifest "$env:RUNNER_TEMP/desktop-proof/candidate-after-build.json"
+          --expected-manifest "$env:RUNNER_TEMP/candidate-artifact/candidate-payload.json"
       - name: Stress native restarts and verify fresh state
-        run: python .github/ci/run_desktop_proof.py "$env:RUNNER_TEMP/restart_proof/build/windows/x64/runner/Release/restart_proof.exe"
-      - uses: actions/upload-artifact@v4
+        run: >-
+          python .github/ci/run_desktop_proof.py
+          "$env:RUNNER_TEMP/restart_proof/build/windows/x64/runner/Release/restart_proof.exe"
+          --cycles 30 --output "$env:RUNNER_TEMP/desktop-proof/desktop-proof.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: restart-proof-windows
-          path: desktop-proof.json
+          path: ${{ runner.temp }}/desktop-proof/
+          if-no-files-found: warn
 
   run-macos:
     name: macOS restart proof
+    needs: candidate-package
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: candidate-package
+          path: ${{ runner.temp }}/candidate-artifact
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.5'
           cache: true
-      - run: flutter create --platforms=macos --project-name restart_proof /tmp/restart_proof
-      - run: cd /tmp/restart_proof && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
-      - run: cp "$GITHUB_WORKSPACE/.github/ci/restart_proof_main.dart" /tmp/restart_proof/lib/main.dart
-      - run: cd /tmp/restart_proof && flutter build macos --debug
+      - name: Extract and verify the shared candidate
+        run: >-
+          python3 .github/ci/package_archive.py "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          --extract "$RUNNER_TEMP/restart_app_candidate"
+          --manifest "$RUNNER_TEMP/desktop-proof/candidate-extracted.json"
+          --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
+      - run: flutter create --platforms=macos --project-name restart_proof "$RUNNER_TEMP/restart_proof"
+      - run: flutter pub add restart_app --path "$RUNNER_TEMP/restart_app_candidate"
+        working-directory: ${{ runner.temp }}/restart_proof
+      - run: cp "$GITHUB_WORKSPACE/.github/ci/restart_proof_main.dart" "$RUNNER_TEMP/restart_proof/lib/main.dart"
+      - name: Verify the package origin before build
+        run: >-
+          python3 .github/ci/candidate_package.py "$RUNNER_TEMP/restart_proof"
+          "$RUNNER_TEMP/restart_app_candidate" --platform macos
+          > "$RUNNER_TEMP/desktop-proof/origin-before-build.txt"
+      - run: flutter build macos --debug
+        working-directory: ${{ runner.temp }}/restart_proof
+      - name: Verify the package origin after build
+        run: >-
+          python3 .github/ci/candidate_package.py "$RUNNER_TEMP/restart_proof"
+          "$RUNNER_TEMP/restart_app_candidate" --platform macos
+          > "$RUNNER_TEMP/desktop-proof/origin-after-build.txt"
+      - name: Verify candidate bytes after build
+        run: >-
+          python3 .github/ci/package_archive.py "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          --verify-dir "$RUNNER_TEMP/restart_app_candidate"
+          --manifest "$RUNNER_TEMP/desktop-proof/candidate-after-build.json"
+          --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
       - name: Stress native restarts and verify fresh state
-        run: python3 .github/ci/run_desktop_proof.py /tmp/restart_proof/build/macos/Build/Products/Debug/restart_proof.app
-      - uses: actions/upload-artifact@v4
+        run: >-
+          python3 .github/ci/run_desktop_proof.py
+          "$RUNNER_TEMP/restart_proof/build/macos/Build/Products/Debug/restart_proof.app"
+          --cycles 30 --output "$RUNNER_TEMP/desktop-proof/desktop-proof.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: restart-proof-macos
-          path: desktop-proof.json
+          path: ${{ runner.temp }}/desktop-proof/
+          if-no-files-found: warn
 
   kotlin-format:
     name: Kotlin format
@@ -435,14 +693,47 @@ jobs:
 
   skills:
     name: Package skills
+    needs: candidate-package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.5'
           cache: true
-      - run: python3 .github/ci/check_skills.py
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          name: candidate-package
+          path: ${{ runner.temp }}/candidate-artifact/
+      - name: Extract and verify the publication candidate
+        run: |
+          mkdir -p "$RUNNER_TEMP/skills-proof"
+          python3 .github/ci/package_archive.py \
+            "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
+            --extract "$RUNNER_TEMP/restart_app_candidate" \
+            --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json" \
+            --manifest "$RUNNER_TEMP/skills-proof/candidate-before.json"
+      - name: Install bundled skills twice and analyze their examples
+        run: |
+          set -o pipefail
+          python3 .github/ci/check_skills.py \
+            --package-dir "$RUNNER_TEMP/restart_app_candidate" \
+            2>&1 | tee "$RUNNER_TEMP/skills-proof/skills.log"
+      - name: Verify the candidate remained unchanged
+        run: >-
+          python3 .github/ci/package_archive.py "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          --verify-dir "$RUNNER_TEMP/restart_app_candidate"
+          --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
+          --manifest "$RUNNER_TEMP/skills-proof/candidate-after.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: skills-proof
+          path: ${{ runner.temp }}/skills-proof/
+          if-no-files-found: warn
 
   publish-check:
     name: Publish check

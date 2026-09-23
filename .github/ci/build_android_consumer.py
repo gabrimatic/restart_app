@@ -9,6 +9,8 @@ import re
 import shutil
 import subprocess
 
+from candidate_package import assert_package_origin, package_directory
+
 
 def run(*arguments: str, cwd: Path) -> None:
     subprocess.run(arguments, cwd=cwd, check=True)
@@ -20,11 +22,14 @@ def main() -> None:
     parser.add_argument('--minimum', action='store_true')
     parser.add_argument('--target-sdk', type=int, default=37)
     parser.add_argument('--compile-minor', type=int)
+    parser.add_argument('--package-dir', type=package_directory,
+                        help='Use an extracted package candidate instead of the checkout.')
     args = parser.parse_args()
     directory = args.directory.resolve()
     if directory.exists():
         parser.error('Choose a new directory for the disposable consumer.')
-    package = Path(__file__).resolve().parents[2]
+    repository = Path(__file__).resolve().parents[2]
+    package = args.package_dir or package_directory(repository)
     run('flutter', 'create', '--platforms=android', '--project-name',
         'restart_android_proof', str(directory), cwd=package)
     (directory / 'pubspec.yaml').write_text(f'''name: restart_android_proof
@@ -40,7 +45,20 @@ dependencies:
 flutter:
   uses-material-design: true
 ''')
-    shutil.copyfile(package / '.github/ci/android_proof_main.dart', directory / 'lib/main.dart')
+    # CI harnesses are intentionally excluded from the published archive.
+    shutil.copyfile(repository / '.github/ci/android_proof_main.dart', directory / 'lib/main.dart')
+    host = directory / 'android/app/src/main/kotlin/com/example/restart_android_proof/MainActivity.kt'
+    shutil.copyfile(repository / '.github/ci/android_proof_activity.kt', host)
+    # The stress runner deliberately rotates through real Activity recreation,
+    # rather than letting FlutterActivity consume both configuration changes.
+    manifest = directory / 'android/app/src/main/AndroidManifest.xml'
+    manifest_text = manifest.read_text()
+    manifest_text = re.sub(
+        r'android:configChanges="([^"]+)"',
+        lambda match: 'android:configChanges="' + '|'.join(
+            value for value in match.group(1).split('|')
+            if value not in ('orientation', 'screenSize')) + '"', manifest_text)
+    manifest.write_text(manifest_text)
     shutil.rmtree(directory / 'test', ignore_errors=True)
     (directory / 'analysis_options.yaml').write_text('analyzer:\n  errors:\n    unused_import: error\n')
     if args.minimum:
@@ -72,8 +90,10 @@ flutter:
     text = text.replace('minSdk = flutter.minSdkVersion', f'minSdk = {21 if args.minimum else 24}')
     application.write_text(text)
     run('flutter', 'pub', 'get', cwd=directory)
+    assert_package_origin(directory, package, required_platforms=('android',))
     run('flutter', 'analyze', cwd=directory)
     run('flutter', 'build', 'apk', '--debug', cwd=directory)
+    assert_package_origin(directory, package, required_platforms=('android',))
     print(directory / 'build/app/outputs/flutter-apk/app-debug.apk')
 
 

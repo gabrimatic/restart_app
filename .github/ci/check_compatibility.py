@@ -10,6 +10,8 @@ import subprocess
 import tempfile
 import shutil
 
+from candidate_package import assert_package_origin, package_directory
+
 
 def run(*args: str, cwd: Path) -> None:
     subprocess.run(args, cwd=cwd, check=True)
@@ -90,9 +92,11 @@ def main() -> None:
     parser.add_argument("--expected-flutter", required=True)
     parser.add_argument("--expected-dart", required=True)
     parser.add_argument("--label", default="consumer")
+    parser.add_argument('--package-dir', type=package_directory,
+                        help='Use an extracted package candidate instead of the checkout.')
     args = parser.parse_args()
 
-    package = Path(__file__).resolve().parents[2]
+    package = args.package_dir or package_directory(Path(__file__).resolve().parents[2])
     actual_flutter, actual_dart = flutter_version()
     if actual_flutter != args.expected_flutter:
         raise RuntimeError(
@@ -108,9 +112,11 @@ def main() -> None:
         consumer = Path(temp)
         write_consumer(consumer, package)
         run("flutter", "pub", "get", cwd=consumer)
+        assert_package_origin(consumer, package, required_platforms=('web',))
         run("flutter", "analyze", cwd=consumer)
         run("flutter", "test", cwd=consumer)
         run("flutter", "build", "web", cwd=consumer)
+        assert_package_origin(consumer, package, required_platforms=('web',))
 
     print(
         f"Verified {args.label} consumer with Flutter {actual_flutter} "

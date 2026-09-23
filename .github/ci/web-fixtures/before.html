@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Before restart probe</title>
+<h1>Before restart probe</h1>
+<a id="start">Open restart probe</a>
+<script>
+  const target = new URLSearchParams(location.search).get('target');
+  if (target) {
+    const url = new URL(target, location.href);
+    if (url.origin !== location.origin) throw new Error('Probe target must use the fixture origin');
+    document.querySelector('#start').href = url.href;
+  }
+</script>
+</html>

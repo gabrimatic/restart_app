@@ -1,0 +1,10 @@
+{
+  "name": "restart-app-browser-checks",
+  "private": true,
+  "scripts": {
+    "test:web": "playwright test --config playwright.config.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

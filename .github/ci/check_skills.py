@@ -8,6 +8,13 @@ import re
 import subprocess
 import tempfile
 
+from candidate_package import (
+    assert_package_origin,
+    assert_package_version,
+    package_directory,
+    resolved_package_directory,
+)
+
 
 def run(*args, cwd):
     subprocess.run(args, cwd=cwd, check=True)
@@ -23,9 +30,12 @@ def files_under(root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--package-version', help='Verify a published version instead of a path dependency.')
+    source_args = parser.add_mutually_exclusive_group()
+    source_args.add_argument('--package-version', help='Verify a published version instead of a path dependency.')
+    source_args.add_argument('--package-dir', type=package_directory,
+                             help='Verify an extracted package candidate instead of the checkout.')
     args = parser.parse_args()
-    package = Path(__file__).resolve().parents[2]
+    package = args.package_dir or package_directory(Path(__file__).resolve().parents[2])
     source = package / 'skills'
     expected = files_under(source)
     entries = sorted(source.glob('*/SKILL.md'))
@@ -52,6 +62,11 @@ def main():
             f"  restart_app: {dependency}\n"
         )
         run('flutter', 'pub', 'get', cwd=consumer)
+        resolved = resolved_package_directory(consumer)
+        if args.package_version:
+            assert_package_version(resolved, args.package_version)
+        assert_package_origin(consumer, resolved if args.package_version else package,
+                              require_native_metadata=False)
         run('dart', 'run', 'skills@', 'get', 'restart_app', '--all', '--agent', 'generic', cwd=consumer)
         installed = consumer / '.agents' / 'skills'
         actual = files_under(installed)
@@ -76,6 +91,8 @@ def main():
         if count == 0:
             raise RuntimeError('No Dart examples found')
         run('flutter', 'analyze', '--no-pub', cwd=consumer)
+        assert_package_origin(consumer, resolved if args.package_version else package,
+                              require_native_metadata=False)
         print(f'Verified {len(entries)} skills, {len(expected)} installed files, and {count} Dart examples.')
 
 

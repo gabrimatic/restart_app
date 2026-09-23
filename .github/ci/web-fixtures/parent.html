@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opaque-origin restart probe</title>
+<style>body{font:16px system-ui}iframe{width:100%;height:650px}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>
+<h1>Opaque-origin restart probe</h1>
+<p>Child origin: <span id="origin">waiting</span></p>
+<pre id="result">Waiting for child</pre>
+<iframe id="probe" title="Restart app sandbox" sandbox="allow-scripts"></iframe>
+<script>
+  const frame = document.querySelector('#probe');
+  const values = new Map();
+  const target = new URL(new URLSearchParams(location.search).get('target'), location.href);
+  if (target.origin !== location.origin || target.searchParams.get('storage') !== 'parent') {
+    throw new Error('Expected a same-server parent-storage probe');
+  }
+  const prefix = `restartProbe.${target.searchParams.get('run')}.`;
+  window.probeEvidence = { requests: [], results: [], origins: [], historyAtRequest: null };
+  addEventListener('message', (event) => {
+    if (event.source !== frame.contentWindow || typeof event.data !== 'string') return;
+    let message;
+    try { message = JSON.parse(event.data); } catch { return; }
+    window.probeEvidence.origins.push(event.origin);
+    document.querySelector('#origin').textContent = event.origin;
+    if (message.type === 'restart-probe-request') {
+      if (typeof message.key !== 'string' || !message.key.startsWith(prefix)) return;
+      if (!['read', 'write'].includes(message.operation)) return;
+      if (message.operation === 'write') {
+        if (typeof message.value !== 'string') return;
+        values.set(message.key, message.value);
+      }
+      window.probeEvidence.requests.push(message);
+      event.source.postMessage(JSON.stringify({
+        type: 'restart-probe-response', requestId: message.requestId,
+        value: values.get(message.key) ?? null,
+      }), '*');
+    } else if (message.type === 'restart-probe-result' && typeof message.message === 'string') {
+      window.probeEvidence.results.push(message.message);
+      if (message.message.startsWith('Restarting ')) window.probeEvidence.historyAtRequest = history.length;
+      document.querySelector('#result').textContent = message.message;
+    }
+  });
+  frame.src = target.href;
+</script>
+</html>

@@ -8,6 +8,13 @@ on:
       - 'README.md'
       - '.github/workflows/docs-pages.yml'
       - 'test/docs_site_test.dart'
+      - '.github/ci/check_readme_images.py'
+      - '.github/ci/test_readme_images.py'
+      - '.github/ci/requirements-readme-images.txt'
+      - '.github/ci/docs_export.spec.mjs'
+      - '.github/ci/docs_playwright.config.mjs'
+      - '.github/ci/serve_docs_export.py'
+      - '.github/ci/package*.json'
   pull_request:
     branches: [master]
     paths:
@@ -15,6 +22,13 @@ on:
       - 'README.md'
       - '.github/workflows/docs-pages.yml'
       - 'test/docs_site_test.dart'
+      - '.github/ci/check_readme_images.py'
+      - '.github/ci/test_readme_images.py'
+      - '.github/ci/requirements-readme-images.txt'
+      - '.github/ci/docs_export.spec.mjs'
+      - '.github/ci/docs_playwright.config.mjs'
+      - '.github/ci/serve_docs_export.py'
+      - '.github/ci/package*.json'
   workflow_dispatch:
 
 concurrency:
@@ -35,6 +49,20 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python3 -m pip install -r .github/ci/requirements-readme-images.txt
+      - run: python3 -B -m unittest discover -s .github/ci -p 'test_readme_images.py'
+      - name: Validate README image content
+        run: >-
+          python3 .github/ci/check_readme_images.py
+          --github-page "https://github.com/${{ github.repository }}/blob/${{ github.sha }}/README.md"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: readme-image-content
+          path: readme-images.json
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -42,7 +70,7 @@ jobs:
       - run: flutter pub get
       - run: flutter test test/docs_site_test.dart
       - run: node --test doc/scripts/prepare-github-pages.test.mjs
-      - run: npm install -g mint
+      - run: npm install -g mint@4.2.918
       - run: mint validate
         working-directory: doc
       - run: mint broken-links
@@ -53,13 +81,24 @@ jobs:
           mkdir -p _site
           unzip -q docs-export.zip -d _site
           node doc/scripts/prepare-github-pages.mjs _site "/${{ github.event.repository.name }}"
+      - run: npm ci --prefix .github/ci
+      - run: npx --prefix .github/ci playwright install --with-deps chromium
+      - name: Verify exported documentation in desktop and mobile browsers
+        run: npx --prefix .github/ci playwright test --config .github/ci/docs_playwright.config.mjs
+        env:
+          RESTART_DOCS_RESULTS: ${{ runner.temp }}/restart_app_docs_results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: documentation-browser-evidence
+          path: ${{ runner.temp }}/restart_app_docs_results
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
   deploy:
     name: Deploy docs
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
     environment:
