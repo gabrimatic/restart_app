@@ -6,30 +6,29 @@ publish_to: 'none'
 version: 1.0.0
 
 environment:
-  sdk: ^3.10.0
-  flutter: ">=3.38.0"
+  sdk: ^3.12.0
+  flutter: ">=3.44.0"
 
 dependencies:
-  cached_network_image: ^3.4.1
-  connectivity_plus: ^6.1.5
-  cupertino_icons: ^1.0.8
-  device_info_plus: ^11.5.0
+  cached_network_image: ^4.0.4
+  connectivity_plus: ^7.3.2
+  device_info_plus: ^13.3.0
   flutter:
     sdk: flutter
-  flutter_cache_manager: ^3.4.1
-  flutter_svg: ^2.2.4
+  flutter_cache_manager: ^3.4.5
+  flutter_svg: ^2.3.0
   flutter_web_plugins:
     sdk: flutter
   http: ^1.6.0
-  package_info_plus: ^9.0.1
-  path_provider: ^2.1.5
+  package_info_plus: ^10.2.2
+  path_provider: ^2.1.6
   restart_app:
     path: ../
-  shared_preferences: ^2.5.5
-  sqflite: ^2.4.2+1
-  url_launcher: ^6.3.2
-  web: ^1.0.0
-  webview_flutter: ^4.13.1
+  shared_preferences: ^2.5.6
+  sqflite: ^2.4.4+2
+  url_launcher: ^6.3.3
+  web: ^1.1.1
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   flutter_test:

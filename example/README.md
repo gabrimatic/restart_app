@@ -12,7 +12,7 @@ flutter pub get
 flutter run
 ```
 
-The example requires Flutter 3.38 and Dart 3.10 or later for its scene APIs and
+The example requires Flutter 3.44 and Dart 3.12 or later for its scene APIs and
 dependencies. The package itself supports older SDKs; see its
 [requirements](https://gabrimatic.github.io/restart_app/quickstart/#requirements). Your Flutter version also determines
 which OS versions you can run.
