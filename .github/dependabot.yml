@@ -20,26 +20,9 @@ updates:
       pub-example:
         patterns: ['*']
 
-  # The plugin's AGP, Kotlin and Robolectric versions are deliberate minimums.
-  - package-ecosystem: gradle
-    directory: /android
-    schedule:
-      interval: monthly
-    ignore:
-      - dependency-name: com.android.tools.build:gradle
-      - dependency-name: org.jetbrains.kotlin:kotlin-gradle-plugin
-      - dependency-name: org.robolectric:robolectric
-    groups:
-      gradle:
-        patterns: ['*']
-
-  - package-ecosystem: gradle
-    directory: /example/android
-    schedule:
-      interval: monthly
-    groups:
-      gradle-example:
-        patterns: ['*']
+  # No Gradle updates. The plugin's AGP, Kotlin and Robolectric versions are
+  # deliberate minimums, and the example's Android toolchain follows the Flutter
+  # app template, which caps AGP, Gradle and Kotlin at the versions Flutter supports.
 
   - package-ecosystem: github-actions
     directory: /
