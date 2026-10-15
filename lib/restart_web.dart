@@ -1,7 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
-// ignore: avoid_web_libraries_in_flutter
 import 'package:web/web.dart' as web show URL, document, window;
 
 /// Web implementation for the `restart` platform channel.
