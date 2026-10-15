@@ -6,7 +6,7 @@ object cleanup, and memory growth.
 
 ## Requirements
 
-Use macOS, Flutter 3.47.5, Xcode, CocoaPods, the `xcodeproj` Ruby gem, and the
+Use macOS, Flutter 3.47.7, Xcode, CocoaPods, the `xcodeproj` Ruby gem, and the
 requested iOS Simulator runtimes. The host uses Flutter's current UIScene and
 implicit-engine APIs, so it needs a newer toolchain than the package minimum.
 The check does not change plugin source or public API.

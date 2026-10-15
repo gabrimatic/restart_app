@@ -1,0 +1,244 @@
+name: Platform proofs
+
+# Slow browser, iOS simulator and Apple dependency-manager proofs. They run
+# when the web or Apple implementations change on master, and on demand
+# before a release.
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/proofs.yml'
+      - 'lib/restart_web.dart'
+      - 'ios/**'
+      - 'macos/**'
+      - 'example/ios/**'
+      - 'example/lib/web_restart_probe.dart'
+      - '.github/ci/web_restart.spec.mjs'
+      - '.github/ci/playwright.config.mjs'
+      - '.github/ci/visibility_browser*.mjs'
+      - '.github/ci/serve_web_probe.py'
+      - '.github/ci/check_apple_dependency_manager.py'
+      - '.github/ci/package*.json'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-package:
+    name: Stage exact publication candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          cache: true
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: flutter pub get
+      - run: flutter pub publish --dry-run
+      - name: Create and inventory the pub-selected archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/candidate-artifact"
+          dart pub publish --to-archive="$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          python3 .github/ci/package_archive.py \
+            "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
+            --manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: candidate-package
+          path: ${{ runner.temp }}/candidate-artifact/
+          if-no-files-found: error
+
+  web-runtime:
+    name: Browser restart proof (${{ matrix.mode }})
+    needs: candidate-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [js, wasm]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: .github/ci/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          name: candidate-package
+          path: ${{ runner.temp }}/candidate-artifact
+      - name: Prepare the archive consumer
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+        run: |
+          python3 .github/ci/package_archive.py \
+            "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
+            --extract "$RUNNER_TEMP/restart-web-package" \
+            --manifest "$RUNNER_TEMP/restart-web-$RESTART_WEB_MODE/candidate-manifest.json" \
+            --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
+          python3 - <<'PY'
+          import json, os, shutil
+          from pathlib import Path
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          package = temporary / 'restart-web-package'
+          consumer = temporary / 'restart-web-consumer'
+          shutil.copytree(package / 'example', consumer)
+          pubspec = consumer / 'pubspec.yaml'
+          source = pubspec.read_text()
+          dependency = '  restart_app:\n    path: ../\n'
+          if source.count(dependency) != 1:
+              raise RuntimeError('Expected one example restart_app path dependency')
+          pubspec.write_text(source.replace(dependency, '  restart_app:\n    path: ' + json.dumps(str(package)) + '\n'))
+          manifest = json.loads((temporary / ('restart-web-' + os.environ['RESTART_WEB_MODE']) / 'candidate-manifest.json').read_text())
+          with open(os.environ['GITHUB_ENV'], 'a') as environment:
+              environment.write('RESTART_PACKAGE_SHA256=' + manifest['archiveSha256'] + '\n')
+          PY
+      - name: Build the real browser probe
+        working-directory: ${{ runner.temp }}/restart-web-consumer
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+        run: |
+          flutter pub get
+          python3 "$GITHUB_WORKSPACE/.github/ci/candidate_package.py" \
+            "$PWD" "$RUNNER_TEMP/restart-web-package" --platform web
+          if [ "$RESTART_WEB_MODE" = wasm ]; then
+            flutter build web -t lib/web_restart_probe.dart --wasm --pwa-strategy=none
+          else
+            flutter build web -t lib/web_restart_probe.dart --pwa-strategy=none
+          fi
+          python3 "$GITHUB_WORKSPACE/.github/ci/candidate_package.py" \
+            "$PWD" "$RUNNER_TEMP/restart-web-package" --platform web
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: .github/ci
+      - name: Verify owned browser cleanup
+        run: node --test visibility_browser.test.mjs
+        working-directory: .github/ci
+      - name: Install isolated test browsers
+        working-directory: .github/ci
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+        run: |
+          if [ "$RESTART_WEB_MODE" = js ]; then
+            npx playwright install --with-deps chromium webkit
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Verify reloads, routes, history and opaque frames
+        run: npm run test:web
+        working-directory: .github/ci
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+          RESTART_WEB_BUILD: ${{ runner.temp }}/restart-web-consumer/build/web
+          RESTART_WEB_RESULTS: ${{ runner.temp }}/restart-web-${{ matrix.mode }}
+      - name: Verify hidden-tab reload and visible return
+        run: xvfb-run -a npx playwright test --config playwright.config.mjs --workers 1 --repeat-each 1 --grep 'tab switch'
+        working-directory: .github/ci
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+          RESTART_WEB_HEADED: '1'
+          RESTART_WEB_BUILD: ${{ runner.temp }}/restart-web-consumer/build/web
+          RESTART_WEB_RESULTS: ${{ runner.temp }}/restart-web-${{ matrix.mode }}-visibility
+      - name: Verify the package stayed unchanged
+        if: always()
+        env:
+          RESTART_WEB_MODE: ${{ matrix.mode }}
+        run: |
+          python3 .github/ci/package_archive.py \
+            "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
+            --manifest "$RUNNER_TEMP/restart-web-$RESTART_WEB_MODE/candidate-after-runtime.json" \
+            --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json" \
+            --verify-dir "$RUNNER_TEMP/restart-web-package"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: restart-web-${{ matrix.mode }}
+          path: |
+            ${{ runner.temp }}/restart-web-${{ matrix.mode }}
+            ${{ runner.temp }}/restart-web-${{ matrix.mode }}-visibility
+          if-no-files-found: warn
+
+  build-darwin-dependency-managers:
+    name: Build iOS and macOS with ${{ matrix.manager }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - manager: CocoaPods
+            flutter: '3.47.7'
+            config: '--no-enable-swift-package-manager'
+            project: restart_app_cocoapods
+            verification: CocoaPods
+          - manager: SwiftPM-legacy
+            flutter: '3.27.0'
+            config: '--enable-swift-package-manager'
+            project: restart_app_swiftpm_legacy
+            verification: SwiftPM
+          - manager: SwiftPM
+            flutter: '3.47.7'
+            config: '--enable-swift-package-manager'
+            project: restart_app_swiftpm
+            verification: SwiftPM
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ matrix.flutter }}
+          cache: true
+      - run: flutter config ${{ matrix.config }}
+      - name: Create native consumer
+        run: >-
+          flutter create --platforms=ios,macos
+          --project-name ${{ matrix.project }}
+          "$RUNNER_TEMP/${{ matrix.project }}"
+      - name: Set the consumer's minimum macOS deployment target
+        run: python3 .github/ci/check_apple_dependency_manager.py "$RUNNER_TEMP/${{ matrix.project }}" --prepare
+      - name: Add restart_app and build both Apple platforms
+        run: |
+          cd "$RUNNER_TEMP/${{ matrix.project }}"
+          flutter pub add restart_app --path "$GITHUB_WORKSPACE"
+          flutter build ios --no-codesign
+          flutter build macos
+      - name: Verify the dependency manager compiled restart_app
+        run: python3 .github/ci/check_apple_dependency_manager.py "$RUNNER_TEMP/${{ matrix.project }}" --manager "${{ matrix.verification }}"
+
+  ios-runner-tests:
+    name: Native iOS RunnerTests on simulator
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          cache: true
+      - run: flutter config --enable-swift-package-manager
+      - name: Generate the example iOS project
+        run: cd example && flutter pub get && flutter build ios --no-codesign --config-only
+      - name: Select an available iPhone simulator
+        run: |
+          simulator_id="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
+          test -n "$simulator_id"
+          echo "IOS_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
+      - name: Run native RunnerTests
+        run: >-
+          xcodebuild test
+          -workspace example/ios/Runner.xcworkspace
+          -scheme Runner
+          -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID"
+          CODE_SIGNING_ALLOWED=NO

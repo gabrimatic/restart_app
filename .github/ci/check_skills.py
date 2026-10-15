@@ -67,7 +67,7 @@ def main():
             assert_package_version(resolved, args.package_version)
         assert_package_origin(consumer, resolved if args.package_version else package,
                               require_native_metadata=False)
-        run('dart', 'run', 'skills@', 'get', 'restart_app', '--all', '--agent', 'generic', cwd=consumer)
+        run('dart', 'run', 'skills@', 'get', '-p', 'restart_app', '--all', '--agent', 'generic', cwd=consumer)
         installed = consumer / '.agents' / 'skills'
         actual = files_under(installed)
         if actual != expected:
@@ -77,7 +77,7 @@ def main():
             raise RuntimeError(f'Installed skills differ: missing={missing}, extra={extra}, changed={changed}')
 
         # A second run must preserve the installed contents.
-        run('dart', 'run', 'skills@', 'get', 'restart_app', '--all', '--agent', 'generic', cwd=consumer)
+        run('dart', 'run', 'skills@', 'get', '-p', 'restart_app', '--all', '--agent', 'generic', cwd=consumer)
         if files_under(installed) != expected:
             raise RuntimeError('Repeated installation changed skill contents')
 

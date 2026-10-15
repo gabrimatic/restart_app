@@ -52,6 +52,10 @@ The [verification guide](.github/ci/verification.md) has the commands for unit
 tests, compatibility checks, native restarts, browser behavior, and documentation.
 A restart check must observe the new Dart boot as well as the accepted request.
 
+Pull requests run the [CI workflow](.github/workflows/ci.yml). The slower
+[platform proofs](.github/workflows/proofs.yml) run after web or Apple changes
+land on `master`, and maintainers run them manually before each release.
+
 ## Maintain package skills
 
 Consumer instructions live in `skills/`, with one `SKILL.md` in each

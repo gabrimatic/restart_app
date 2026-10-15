@@ -45,11 +45,11 @@ jobs:
     name: Validate and export docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - run: python3 -m pip install -r .github/ci/requirements-readme-images.txt
@@ -58,7 +58,7 @@ jobs:
         run: >-
           python3 .github/ci/check_readme_images.py
           --github-page "https://github.com/${{ github.repository }}/blob/${{ github.sha }}/README.md"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: readme-image-content
@@ -70,7 +70,7 @@ jobs:
       - run: flutter pub get
       - run: flutter test test/docs_site_test.dart
       - run: node --test doc/scripts/prepare-github-pages.test.mjs
-      - run: npm install -g mint@4.2.918
+      - run: npm install -g mint@4.2.1040
       - run: mint validate
         working-directory: doc
       - run: mint broken-links
@@ -87,7 +87,7 @@ jobs:
         run: npx --prefix .github/ci playwright test --config .github/ci/docs_playwright.config.mjs
         env:
           RESTART_DOCS_RESULTS: ${{ runner.temp }}/restart_app_docs_results
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: documentation-browser-evidence
@@ -105,6 +105,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/configure-pages@v5
-      - uses: actions/deploy-pages@v4
+      - uses: actions/configure-pages@v6
+      - uses: actions/deploy-pages@v5
         id: deployment

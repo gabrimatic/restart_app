@@ -1,0 +1,66 @@
+version: 2
+
+updates:
+  # Keep the package's published constraints as wide as they are; only move
+  # them when a release needs a newer version.
+  - package-ecosystem: pub
+    directory: /
+    versioning-strategy: increase-if-necessary
+    schedule:
+      interval: monthly
+    groups:
+      pub:
+        patterns: ['*']
+
+  - package-ecosystem: pub
+    directory: /example
+    schedule:
+      interval: monthly
+    groups:
+      pub-example:
+        patterns: ['*']
+
+  # The plugin's AGP, Kotlin and Robolectric versions are deliberate minimums.
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: monthly
+    ignore:
+      - dependency-name: com.android.tools.build:gradle
+      - dependency-name: org.jetbrains.kotlin:kotlin-gradle-plugin
+      - dependency-name: org.robolectric:robolectric
+    groups:
+      gradle:
+        patterns: ['*']
+
+  - package-ecosystem: gradle
+    directory: /example/android
+    schedule:
+      interval: monthly
+    groups:
+      gradle-example:
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /.github/ci
+    schedule:
+      interval: monthly
+    groups:
+      npm:
+        patterns: ['*']
+
+  - package-ecosystem: pip
+    directory: /.github/ci
+    schedule:
+      interval: monthly
+    groups:
+      pip:
+        patterns: ['*']

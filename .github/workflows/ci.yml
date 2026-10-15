@@ -43,17 +43,24 @@ on:
       - 'test_apps/**'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   candidate-package:
     name: Stage exact publication candidate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.5'
+          flutter-version: '3.47.7'
           cache: true
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - run: flutter pub get
@@ -72,34 +79,34 @@ jobs:
           if-no-files-found: error
 
   analyze:
-    name: Analyze
+    name: Analyze and lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
       - run: flutter pub get
       - run: flutter analyze
-
-  format:
-    name: Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter pub get
       - run: dart format --set-exit-if-changed lib/ test/ example/lib/ example/test/
+      - name: Kotlin format
+        run: |
+          curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.8.0/ktlint && chmod +x ktlint
+          ./ktlint 'android/src/main/kotlin/**/*.kt' 'android/src/test/kotlin/**/*.kt'
+      - run: sudo apt-get install -y clang-format
+      - name: C++ format
+        run: clang-format --dry-run --Werror linux/*.cc linux/*.h windows/*.cpp windows/*.h
+      - name: Check bounded Linux argument ownership with sanitizers
+        run: |
+          clang++ -std=c++14 -Wall -Wextra -Werror -fsanitize=address,undefined -g linux/restart_app_argv.cc linux/restart_app_argv_test.cc -o /tmp/restart_app_argv_test
+          /tmp/restart_app_argv_test
 
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -108,7 +115,7 @@ jobs:
       - run: flutter test
       - run: flutter test --platform chrome test/restart_web_test.dart
       - run: cd example && flutter pub get && flutter test
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - run: python3 -m pip install -r .github/ci/requirements-readme-images.txt
@@ -134,10 +141,10 @@ jobs:
             flutter: '3.44.0'
             dart: '3.12'
           - label: latest
-            flutter: '3.47.5'
+            flutter: '3.47.7'
             dart: '3.13'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ matrix.flutter }}
@@ -152,7 +159,7 @@ jobs:
     name: Build Android example
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -170,11 +177,11 @@ jobs:
             flutter: '3.22.0'
             options: '--minimum --target-sdk 34'
           - label: current-target
-            flutter: '3.47.5'
+            flutter: '3.47.7'
             options: '--target-sdk 37 --compile-minor 0'
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -187,7 +194,7 @@ jobs:
         if: matrix.label == 'current-target'
         working-directory: ${{ runner.temp }}/android_consumer/android
         run: ./gradlew :restart_app:testDebugUnitTest --tests gabrimatic.info.restart.RestartPluginTest
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: android-consumer-${{ matrix.label }}
           path: ${{ runner.temp }}/android_consumer/build/app/outputs/flutter-apk/app-debug.apk
@@ -203,27 +210,19 @@ jobs:
             agp: '9.0.1'
             gradle: '9.1.0'
             built_in_kotlin: 'false'
-          - flutter: '3.44.0'
-            agp: '9.1.0'
-            gradle: '9.5.0'
-            built_in_kotlin: 'false'
-          - flutter: '3.47.5'
-            agp: '9.0.1'
-            gradle: '9.1.0'
-            built_in_kotlin: 'true'
-          - flutter: '3.47.5'
+          - flutter: '3.47.7'
             agp: '9.1.0'
             gradle: '9.5.0'
             built_in_kotlin: 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ matrix.flutter }}
           cache: true
-      # The example app stays on AGP 8, so a fresh app pins the AGP 9 toolchain
-      # instead. Flutter 3.44 exercises the temporary legacy-KGP compatibility
-      # path, while Flutter 3.47 exercises the supported built-in Kotlin path.
+      # The example app covers the Flutter template (AGP 9 with built-in Kotlin
+      # disabled). Flutter 3.44 exercises the first AGP 9 template with the
+      # legacy Kotlin Gradle Plugin, and Flutter 3.47 the built-in Kotlin path.
       - run: flutter create --platforms=android --project-name restart_app_agp9_smoke /tmp/restart_app_agp9_smoke
       - name: Pin AGP ${{ matrix.agp }} and Gradle ${{ matrix.gradle }}
         working-directory: /tmp/restart_app_agp9_smoke/android
@@ -245,269 +244,29 @@ jobs:
     name: Build web example
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
       - run: cd example && flutter pub get && flutter build web
 
-  web-runtime:
-    name: Browser restart proof (${{ matrix.mode }})
-    needs: candidate-package
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: [js, wasm]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.47.5'
-          cache: true
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: .github/ci/package-lock.json
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-      - uses: actions/download-artifact@v8
-        with:
-          name: candidate-package
-          path: ${{ runner.temp }}/candidate-artifact
-      - name: Prepare the archive consumer
-        env:
-          RESTART_WEB_MODE: ${{ matrix.mode }}
-        run: |
-          python3 .github/ci/package_archive.py \
-            "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
-            --extract "$RUNNER_TEMP/restart-web-package" \
-            --manifest "$RUNNER_TEMP/restart-web-$RESTART_WEB_MODE/candidate-manifest.json" \
-            --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
-          python3 - <<'PY'
-          import json, os, shutil
-          from pathlib import Path
-          temporary = Path(os.environ['RUNNER_TEMP'])
-          package = temporary / 'restart-web-package'
-          consumer = temporary / 'restart-web-consumer'
-          shutil.copytree(package / 'example', consumer)
-          pubspec = consumer / 'pubspec.yaml'
-          source = pubspec.read_text()
-          dependency = '  restart_app:\n    path: ../\n'
-          if source.count(dependency) != 1:
-              raise RuntimeError('Expected one example restart_app path dependency')
-          pubspec.write_text(source.replace(dependency, '  restart_app:\n    path: ' + json.dumps(str(package)) + '\n'))
-          manifest = json.loads((temporary / ('restart-web-' + os.environ['RESTART_WEB_MODE']) / 'candidate-manifest.json').read_text())
-          with open(os.environ['GITHUB_ENV'], 'a') as environment:
-              environment.write('RESTART_PACKAGE_SHA256=' + manifest['archiveSha256'] + '\n')
-          PY
-      - name: Build the real browser probe
-        working-directory: ${{ runner.temp }}/restart-web-consumer
-        env:
-          RESTART_WEB_MODE: ${{ matrix.mode }}
-        run: |
-          flutter pub get
-          python3 "$GITHUB_WORKSPACE/.github/ci/candidate_package.py" \
-            "$PWD" "$RUNNER_TEMP/restart-web-package" --platform web
-          if [ "$RESTART_WEB_MODE" = wasm ]; then
-            flutter build web -t lib/web_restart_probe.dart --wasm --pwa-strategy=none
-          else
-            flutter build web -t lib/web_restart_probe.dart --pwa-strategy=none
-          fi
-          python3 "$GITHUB_WORKSPACE/.github/ci/candidate_package.py" \
-            "$PWD" "$RUNNER_TEMP/restart-web-package" --platform web
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-        working-directory: .github/ci
-      - name: Verify owned browser cleanup
-        run: node --test visibility_browser.test.mjs
-        working-directory: .github/ci
-      - name: Install isolated test browsers
-        working-directory: .github/ci
-        env:
-          RESTART_WEB_MODE: ${{ matrix.mode }}
-        run: |
-          if [ "$RESTART_WEB_MODE" = js ]; then
-            npx playwright install --with-deps chromium webkit
-          else
-            npx playwright install --with-deps chromium
-          fi
-      - name: Verify reloads, routes, history and opaque frames
-        run: npm run test:web
-        working-directory: .github/ci
-        env:
-          RESTART_WEB_MODE: ${{ matrix.mode }}
-          RESTART_WEB_BUILD: ${{ runner.temp }}/restart-web-consumer/build/web
-          RESTART_WEB_RESULTS: ${{ runner.temp }}/restart-web-${{ matrix.mode }}
-      - name: Verify hidden-tab reload and visible return
-        run: xvfb-run -a npx playwright test --config playwright.config.mjs --workers 1 --repeat-each 1 --grep 'tab switch'
-        working-directory: .github/ci
-        env:
-          RESTART_WEB_MODE: ${{ matrix.mode }}
-          RESTART_WEB_HEADED: '1'
-          RESTART_WEB_BUILD: ${{ runner.temp }}/restart-web-consumer/build/web
-          RESTART_WEB_RESULTS: ${{ runner.temp }}/restart-web-${{ matrix.mode }}-visibility
-      - name: Verify the package stayed unchanged
-        if: always()
-        env:
-          RESTART_WEB_MODE: ${{ matrix.mode }}
-        run: |
-          python3 .github/ci/package_archive.py \
-            "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
-            --manifest "$RUNNER_TEMP/restart-web-$RESTART_WEB_MODE/candidate-after-runtime.json" \
-            --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json" \
-            --verify-dir "$RUNNER_TEMP/restart-web-package"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: restart-web-${{ matrix.mode }}
-          path: |
-            ${{ runner.temp }}/restart-web-${{ matrix.mode }}
-            ${{ runner.temp }}/restart-web-${{ matrix.mode }}-visibility
-          if-no-files-found: warn
-
-  build-linux:
-    name: Build Linux example
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: sudo apt-get update
-      - run: sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
-      - run: flutter create --platforms=linux /tmp/restart_app_linux_smoke
-      - run: cd /tmp/restart_app_linux_smoke && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
-      - run: cd /tmp/restart_app_linux_smoke && flutter build linux
-
-  build-macos-ios:
-    name: Build macOS and iOS
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: cd example && flutter pub get && flutter build ios --no-codesign
-      - run: flutter create --platforms=macos /tmp/restart_app_macos_smoke
-      - run: cd /tmp/restart_app_macos_smoke && flutter pub add restart_app --path "$GITHUB_WORKSPACE"
-      - run: cd /tmp/restart_app_macos_smoke && flutter build macos
-
-  build-darwin-dependency-managers:
-    name: Build iOS and macOS with ${{ matrix.manager }}
-    runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - manager: CocoaPods
-            flutter: '3.47.5'
-            config: '--no-enable-swift-package-manager'
-            project: restart_app_cocoapods
-            verification: CocoaPods
-          - manager: SwiftPM-legacy
-            flutter: '3.27.0'
-            config: '--enable-swift-package-manager'
-            project: restart_app_swiftpm_legacy
-            verification: SwiftPM
-          - manager: SwiftPM
-            flutter: '3.47.5'
-            config: '--enable-swift-package-manager'
-            project: restart_app_swiftpm
-            verification: SwiftPM
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ matrix.flutter }}
-          cache: true
-      - run: flutter config ${{ matrix.config }}
-      - name: Create native consumer
-        run: >-
-          flutter create --platforms=ios,macos
-          --project-name ${{ matrix.project }}
-          "$RUNNER_TEMP/${{ matrix.project }}"
-      - name: Set the consumer's minimum macOS deployment target
-        run: python3 .github/ci/check_apple_dependency_manager.py "$RUNNER_TEMP/${{ matrix.project }}" --prepare
-      - name: Add restart_app and build both Apple platforms
-        run: |
-          cd "$RUNNER_TEMP/${{ matrix.project }}"
-          flutter pub add restart_app --path "$GITHUB_WORKSPACE"
-          flutter build ios --no-codesign
-          flutter build macos
-      - name: Verify the dependency manager compiled restart_app
-        run: python3 .github/ci/check_apple_dependency_manager.py "$RUNNER_TEMP/${{ matrix.project }}" --manager "${{ matrix.verification }}"
-
-  ios-runner-tests:
-    name: Native iOS RunnerTests on simulator
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.47.5'
-          cache: true
-      - run: flutter config --enable-swift-package-manager
-      - name: Generate the example iOS project
-        run: cd example && flutter pub get && flutter build ios --no-codesign --config-only
-      - name: Select an available iPhone simulator
-        run: |
-          simulator_id="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
-          test -n "$simulator_id"
-          echo "IOS_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
-      - name: Run native RunnerTests
-        run: >-
-          xcodebuild test
-          -workspace example/ios/Runner.xcworkspace
-          -scheme Runner
-          -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID"
-          CODE_SIGNING_ALLOWED=NO
-
-  build-windows:
-    name: Build Windows example
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter create --platforms=windows "$env:RUNNER_TEMP\restart_app_windows_smoke"
-      - run: flutter pub add restart_app --path "$env:GITHUB_WORKSPACE"
-        working-directory: ${{ runner.temp }}\restart_app_windows_smoke
-      - run: flutter build windows
-        working-directory: ${{ runner.temp }}\restart_app_windows_smoke
-
-  windows-native-tests:
-    name: Windows native relaunch failures
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-      - run: cmake -S windows/tests -B "$env:RUNNER_TEMP\restart_native_tests"
-      - run: cmake --build "$env:RUNNER_TEMP\restart_native_tests" --config Release
-      - run: ctest --test-dir "$env:RUNNER_TEMP\restart_native_tests" -C Release --output-on-failure
-
   run-linux:
     name: Linux restart proof
     needs: candidate-package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: candidate-package
           path: ${{ runner.temp }}/candidate-artifact
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.5'
+          flutter-version: '3.47.7'
           cache: true
       - name: Extract and verify the shared candidate
         run: >-
@@ -552,22 +311,86 @@ jobs:
           path: ${{ runner.temp }}/desktop-proof/
           if-no-files-found: warn
 
-  run-windows:
-    name: Windows restart proof
+  run-macos:
+    name: Apple builds and macOS restart proof
     needs: candidate-package
-    runs-on: windows-latest
+    runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
+      - name: Swift format
+        run: xcrun swift-format lint --recursive ios/restart_app/Sources/ macos/restart_app/Sources/
       - uses: actions/download-artifact@v8
         with:
           name: candidate-package
           path: ${{ runner.temp }}/candidate-artifact
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.5'
+          flutter-version: '3.47.7'
+          cache: true
+      - name: Extract and verify the shared candidate
+        run: >-
+          python3 .github/ci/package_archive.py "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          --extract "$RUNNER_TEMP/restart_app_candidate"
+          --manifest "$RUNNER_TEMP/desktop-proof/candidate-extracted.json"
+          --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
+      - run: flutter create --platforms=macos --project-name restart_proof "$RUNNER_TEMP/restart_proof"
+      - run: flutter pub add restart_app --path "$RUNNER_TEMP/restart_app_candidate"
+        working-directory: ${{ runner.temp }}/restart_proof
+      - run: cp "$GITHUB_WORKSPACE/.github/ci/restart_proof_main.dart" "$RUNNER_TEMP/restart_proof/lib/main.dart"
+      - name: Verify the package origin before build
+        run: >-
+          python3 .github/ci/candidate_package.py "$RUNNER_TEMP/restart_proof"
+          "$RUNNER_TEMP/restart_app_candidate" --platform macos
+          > "$RUNNER_TEMP/desktop-proof/origin-before-build.txt"
+      - run: flutter build macos --debug
+        working-directory: ${{ runner.temp }}/restart_proof
+      - name: Verify the package origin after build
+        run: >-
+          python3 .github/ci/candidate_package.py "$RUNNER_TEMP/restart_proof"
+          "$RUNNER_TEMP/restart_app_candidate" --platform macos
+          > "$RUNNER_TEMP/desktop-proof/origin-after-build.txt"
+      - name: Verify candidate bytes after build
+        run: >-
+          python3 .github/ci/package_archive.py "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
+          --verify-dir "$RUNNER_TEMP/restart_app_candidate"
+          --manifest "$RUNNER_TEMP/desktop-proof/candidate-after-build.json"
+          --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
+      - name: Stress native restarts and verify fresh state
+        run: >-
+          python3 .github/ci/run_desktop_proof.py
+          "$RUNNER_TEMP/restart_proof/build/macos/Build/Products/Debug/restart_proof.app"
+          --cycles 30 --output "$RUNNER_TEMP/desktop-proof/desktop-proof.json"
+      - name: Build the iOS example
+        run: cd example && flutter pub get && flutter build ios --no-codesign
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: restart-proof-macos
+          path: ${{ runner.temp }}/desktop-proof/
+          if-no-files-found: warn
+
+  run-windows:
+    name: Windows native tests and restart proof
+    needs: candidate-package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake -S windows/tests -B "$env:RUNNER_TEMP\restart_native_tests"
+      - run: cmake --build "$env:RUNNER_TEMP\restart_native_tests" --config Release
+      - run: ctest --test-dir "$env:RUNNER_TEMP\restart_native_tests" -C Release --output-on-failure
+      - uses: actions/download-artifact@v8
+        with:
+          name: candidate-package
+          path: ${{ runner.temp }}/candidate-artifact
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
           cache: true
       - name: Extract and verify the shared candidate
         run: >-
@@ -610,101 +433,17 @@ jobs:
           path: ${{ runner.temp }}/desktop-proof/
           if-no-files-found: warn
 
-  run-macos:
-    name: macOS restart proof
-    needs: candidate-package
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v8
-        with:
-          name: candidate-package
-          path: ${{ runner.temp }}/candidate-artifact
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.47.5'
-          cache: true
-      - name: Extract and verify the shared candidate
-        run: >-
-          python3 .github/ci/package_archive.py "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
-          --extract "$RUNNER_TEMP/restart_app_candidate"
-          --manifest "$RUNNER_TEMP/desktop-proof/candidate-extracted.json"
-          --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
-      - run: flutter create --platforms=macos --project-name restart_proof "$RUNNER_TEMP/restart_proof"
-      - run: flutter pub add restart_app --path "$RUNNER_TEMP/restart_app_candidate"
-        working-directory: ${{ runner.temp }}/restart_proof
-      - run: cp "$GITHUB_WORKSPACE/.github/ci/restart_proof_main.dart" "$RUNNER_TEMP/restart_proof/lib/main.dart"
-      - name: Verify the package origin before build
-        run: >-
-          python3 .github/ci/candidate_package.py "$RUNNER_TEMP/restart_proof"
-          "$RUNNER_TEMP/restart_app_candidate" --platform macos
-          > "$RUNNER_TEMP/desktop-proof/origin-before-build.txt"
-      - run: flutter build macos --debug
-        working-directory: ${{ runner.temp }}/restart_proof
-      - name: Verify the package origin after build
-        run: >-
-          python3 .github/ci/candidate_package.py "$RUNNER_TEMP/restart_proof"
-          "$RUNNER_TEMP/restart_app_candidate" --platform macos
-          > "$RUNNER_TEMP/desktop-proof/origin-after-build.txt"
-      - name: Verify candidate bytes after build
-        run: >-
-          python3 .github/ci/package_archive.py "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz"
-          --verify-dir "$RUNNER_TEMP/restart_app_candidate"
-          --manifest "$RUNNER_TEMP/desktop-proof/candidate-after-build.json"
-          --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
-      - name: Stress native restarts and verify fresh state
-        run: >-
-          python3 .github/ci/run_desktop_proof.py
-          "$RUNNER_TEMP/restart_proof/build/macos/Build/Products/Debug/restart_proof.app"
-          --cycles 30 --output "$RUNNER_TEMP/desktop-proof/desktop-proof.json"
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: restart-proof-macos
-          path: ${{ runner.temp }}/desktop-proof/
-          if-no-files-found: warn
-
-  kotlin-format:
-    name: Kotlin format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - run: curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.5.0/ktlint && chmod +x ktlint
-      - run: ./ktlint 'android/src/main/kotlin/**/*.kt' 'android/src/test/kotlin/**/*.kt'
-
-  swift-format:
-    name: Swift format
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-      - run: xcrun swift-format lint --recursive ios/restart_app/Sources/ macos/restart_app/Sources/
-
-  cpp-format:
-    name: C++ format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - run: sudo apt-get install -y clang-format
-      - run: clang-format --dry-run --Werror linux/*.cc linux/*.h windows/*.cpp windows/*.h
-      - name: Check bounded Linux argument ownership with sanitizers
-        run: |
-          clang++ -std=c++14 -Wall -Wextra -Werror -fsanitize=address,undefined -g linux/restart_app_argv.cc linux/restart_app_argv_test.cc -o /tmp/restart_app_argv_test
-          /tmp/restart_app_argv_test
-
   skills:
     name: Package skills
     needs: candidate-package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.5'
+          flutter-version: '3.47.7'
           cache: true
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - uses: actions/download-artifact@v8
@@ -737,15 +476,3 @@ jobs:
           name: skills-proof
           path: ${{ runner.temp }}/skills-proof/
           if-no-files-found: warn
-
-  publish-check:
-    name: Publish check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: dart pub publish --dry-run
