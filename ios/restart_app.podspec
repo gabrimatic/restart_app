@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'restart_app'
-  s.version          = '1.10.1'
+  s.version          = '1.10.2'
   s.summary          = 'Restart Flutter apps from Dart.'
   s.description      = <<-DESC
 Restart a Flutter app on iOS by creating a new engine and registering its plugins through AppDelegate.

@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'restart_app'
-  s.version          = '1.10.1'
+  s.version          = '1.10.2'
   s.summary          = 'Restart Flutter apps from Dart.'
   s.description      = <<-DESC
 Restart a Flutter macOS app by launching a new instance and requesting termination of the existing one.

@@ -1,3 +1,10 @@
+## 1.10.2
+
+* Fixed the agent skills install command to `dart run skills@ get -p restart_app`. The previous form ignored the package name and offered skills from every dependency.
+* Reorganized the README around setup, error handling, and requirements.
+* Removed an unused Gradle wrapper and Jetifier setting from the Android plugin project. App builds are unchanged.
+* Updated the example to current dependencies and the Flutter 3.47 Android toolchain (AGP 9.1, Gradle 9.3, Kotlin 2.4). The example now requires Flutter 3.44 or later; the package requirements are unchanged.
+
 ## 1.10.1
 
 * Simplified the README, guides, examples, and changelog; corrected documentation links.

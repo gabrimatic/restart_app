@@ -1,6 +1,6 @@
 name: restart_app
 description: Restart Flutter apps on Android, iOS, web, macOS, Linux, and Windows. Supports app relaunch, iOS engine restart, and bundled AI agent skills.
-version: 1.10.1
+version: 1.10.2
 homepage: https://gabrimatic.github.io/restart_app/
 documentation: https://gabrimatic.github.io/restart_app/
 repository: https://github.com/gabrimatic/restart_app
