@@ -16,6 +16,9 @@ updates:
     directory: /example
     schedule:
       interval: monthly
+    ignore:
+      # The example uses the package from its parent directory.
+      - dependency-name: restart_app
     groups:
       pub-example:
         patterns: ['*']
