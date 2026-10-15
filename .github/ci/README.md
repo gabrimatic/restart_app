@@ -10,8 +10,9 @@ behavior in consumer apps.
 - [CI workflow](../workflows/ci.yml): package, lint, build, compatibility, and
   desktop restart checks on every relevant push and pull request.
 - [Platform proofs](../workflows/proofs.yml): browser restarts, the iOS simulator
-  RunnerTests, and CocoaPods and SwiftPM builds. They run when the web or Apple
-  implementations change on `master`; run them manually before a release.
+  RunnerTests, and CocoaPods and SwiftPM builds. They run when the Dart API, web
+  or Apple code, package manifest, or example change on `master`; run them
+  manually before a release.
 - [Documentation workflow](../workflows/docs-pages.yml): site validation and publication.
 
 See [Contributing](../../CONTRIBUTING.md) for the development workflow.

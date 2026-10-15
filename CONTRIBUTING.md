@@ -53,8 +53,9 @@ tests, compatibility checks, native restarts, browser behavior, and documentatio
 A restart check must observe the new Dart boot as well as the accepted request.
 
 Pull requests run the [CI workflow](.github/workflows/ci.yml). The slower
-[platform proofs](.github/workflows/proofs.yml) run after web or Apple changes
-land on `master`, and maintainers run them manually before each release.
+[platform proofs](.github/workflows/proofs.yml) run after changes to the Dart
+API, web or Apple code, package manifest, or example land on `master`, and
+maintainers run them manually before each release.
 
 ## Maintain package skills
 

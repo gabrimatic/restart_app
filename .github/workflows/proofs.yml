@@ -1,22 +1,30 @@
 name: Platform proofs
 
 # Slow browser, iOS simulator and Apple dependency-manager proofs. They run
-# when the web or Apple implementations change on master, and on demand
-# before a release.
+# when the Dart API, web or Apple implementations, package manifest, example
+# app, or proof tooling change on master, and on demand before a release.
 on:
   push:
     branches: [master]
     paths:
       - '.github/workflows/proofs.yml'
-      - 'lib/restart_web.dart'
+      - '.pubignore'
+      - 'pubspec.yaml'
+      - 'lib/**'
       - 'ios/**'
       - 'macos/**'
+      - 'example/pubspec.yaml'
+      - 'example/pubspec.lock'
+      - 'example/lib/**'
       - 'example/ios/**'
-      - 'example/lib/web_restart_probe.dart'
+      - 'example/web/**'
+      - '.github/ci/package_archive.py'
+      - '.github/ci/candidate_package.py'
       - '.github/ci/web_restart.spec.mjs'
       - '.github/ci/playwright.config.mjs'
       - '.github/ci/visibility_browser*.mjs'
       - '.github/ci/serve_web_probe.py'
+      - '.github/ci/web-fixtures/**'
       - '.github/ci/check_apple_dependency_manager.py'
       - '.github/ci/package*.json'
   workflow_dispatch:
