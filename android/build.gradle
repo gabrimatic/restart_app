@@ -83,5 +83,5 @@ kotlin {
 dependencies {
     testImplementation 'junit:junit:4.13.2'
     // Keep API 21 coverage, which Robolectric 4.16 and newer no longer support.
-    testImplementation 'org.robolectric:robolectric:4.15'
+    testImplementation 'org.robolectric:robolectric:4.15.1'
 }
