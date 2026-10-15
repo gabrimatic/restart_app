@@ -16,19 +16,19 @@ From your Flutter project, run:
 
 ```sh
 flutter pub get
-dart run skills@ get restart_app
+dart run skills@ get -p restart_app
 ```
 
 Select the skills when prompted. To install both:
 
 ```sh
-dart run skills@ get restart_app --all
+dart run skills@ get -p restart_app --all
 ```
 
 The CLI detects supported coding agents and installs the instructions in their configuration directories. For a generic Agent Skills directory, use:
 
 ```sh
-dart run skills@ get restart_app --all --agent generic
+dart run skills@ get -p restart_app --all --agent generic
 ```
 
 This installs the files under `.agents/skills/`. The iOS skill includes `references/host-setup.md`; keep it with the skill if you copy the files manually.
@@ -41,7 +41,7 @@ With Dart 3.10 or 3.11, use the globally installed CLI:
 
 ```sh
 dart pub global activate skills
-dart pub global run skills get restart_app
+dart pub global run skills get -p restart_app
 ```
 
 Installing skills does not add a runtime dependency or change your app's minimum Dart or Flutter version. The instructions guide your agent; they do not run inside your app.
