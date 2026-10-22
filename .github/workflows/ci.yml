@@ -55,12 +55,12 @@ jobs:
     name: Stage exact publication candidate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.47.7'
           cache: true
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.13'
       - run: flutter pub get
@@ -72,7 +72,7 @@ jobs:
           python3 .github/ci/package_archive.py \
             "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
             --manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: candidate-package
           path: ${{ runner.temp }}/candidate-artifact/
@@ -82,8 +82,8 @@ jobs:
     name: Analyze and lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           cache: true
@@ -106,8 +106,8 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           cache: true
@@ -115,7 +115,7 @@ jobs:
       - run: flutter test
       - run: flutter test --platform chrome test/restart_web_test.dart
       - run: cd example && flutter pub get && flutter test
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.13'
       - run: python3 -m pip install -r .github/ci/requirements-readme-images.txt
@@ -144,8 +144,8 @@ jobs:
             flutter: '3.47.7'
             dart: '3.13'
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ matrix.flutter }}
           cache: true
@@ -159,8 +159,8 @@ jobs:
     name: Build Android example
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           cache: true
@@ -180,12 +180,12 @@ jobs:
             flutter: '3.47.7'
             options: '--target-sdk 37 --compile-minor 0'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           distribution: temurin
           java-version: '17'
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ matrix.flutter }}
           cache: true
@@ -194,7 +194,7 @@ jobs:
         if: matrix.label == 'current-target'
         working-directory: ${{ runner.temp }}/android_consumer/android
         run: ./gradlew :restart_app:testDebugUnitTest --tests gabrimatic.info.restart.RestartPluginTest
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: android-consumer-${{ matrix.label }}
           path: ${{ runner.temp }}/android_consumer/build/app/outputs/flutter-apk/app-debug.apk
@@ -215,8 +215,8 @@ jobs:
             gradle: '9.5.0'
             built_in_kotlin: 'true'
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ matrix.flutter }}
           cache: true
@@ -244,8 +244,8 @@ jobs:
     name: Build web example
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           cache: true
@@ -256,15 +256,15 @@ jobs:
     needs: candidate-package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: candidate-package
           path: ${{ runner.temp }}/candidate-artifact
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.13'
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.47.7'
           cache: true
@@ -304,7 +304,7 @@ jobs:
           xvfb-run -a python3 .github/ci/run_desktop_proof.py
           "$RUNNER_TEMP/restart_proof/build/linux/x64/release/bundle/restart_proof"
           --cycles 30 --output "$RUNNER_TEMP/desktop-proof/desktop-proof.json"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: restart-proof-linux
@@ -316,17 +316,17 @@ jobs:
     needs: candidate-package
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Swift format
         run: xcrun swift-format lint --recursive ios/restart_app/Sources/ macos/restart_app/Sources/
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: candidate-package
           path: ${{ runner.temp }}/candidate-artifact
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.13'
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.47.7'
           cache: true
@@ -365,7 +365,7 @@ jobs:
           --cycles 30 --output "$RUNNER_TEMP/desktop-proof/desktop-proof.json"
       - name: Build the iOS example
         run: cd example && flutter pub get && flutter build ios --no-codesign
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: restart-proof-macos
@@ -377,18 +377,18 @@ jobs:
     needs: candidate-package
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: cmake -S windows/tests -B "$env:RUNNER_TEMP\restart_native_tests"
       - run: cmake --build "$env:RUNNER_TEMP\restart_native_tests" --config Release
       - run: ctest --test-dir "$env:RUNNER_TEMP\restart_native_tests" -C Release --output-on-failure
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: candidate-package
           path: ${{ runner.temp }}/candidate-artifact
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.13'
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.47.7'
           cache: true
@@ -426,7 +426,7 @@ jobs:
           python .github/ci/run_desktop_proof.py
           "$env:RUNNER_TEMP/restart_proof/build/windows/x64/runner/Release/restart_proof.exe"
           --cycles 30 --output "$env:RUNNER_TEMP/desktop-proof/desktop-proof.json"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: restart-proof-windows
@@ -438,15 +438,15 @@ jobs:
     needs: candidate-package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.47.7'
           cache: true
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.13'
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: candidate-package
           path: ${{ runner.temp }}/candidate-artifact/
@@ -470,7 +470,7 @@ jobs:
           --verify-dir "$RUNNER_TEMP/restart_app_candidate"
           --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
           --manifest "$RUNNER_TEMP/skills-proof/candidate-after.json"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: skills-proof

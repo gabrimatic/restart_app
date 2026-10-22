@@ -41,12 +41,12 @@ jobs:
     name: Stage exact publication candidate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.47.7'
           cache: true
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.13'
       - run: flutter pub get
@@ -58,7 +58,7 @@ jobs:
           python3 .github/ci/package_archive.py \
             "$RUNNER_TEMP/candidate-artifact/restart_app-candidate.tar.gz" \
             --manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: candidate-package
           path: ${{ runner.temp }}/candidate-artifact/
@@ -74,20 +74,20 @@ jobs:
       matrix:
         mode: [js, wasm]
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.47.7'
           cache: true
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: .github/ci/package-lock.json
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.13'
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: candidate-package
           path: ${{ runner.temp }}/candidate-artifact
@@ -172,7 +172,7 @@ jobs:
             --manifest "$RUNNER_TEMP/restart-web-$RESTART_WEB_MODE/candidate-after-runtime.json" \
             --expected-manifest "$RUNNER_TEMP/candidate-artifact/candidate-payload.json" \
             --verify-dir "$RUNNER_TEMP/restart-web-package"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: restart-web-${{ matrix.mode }}
@@ -204,8 +204,8 @@ jobs:
             project: restart_app_swiftpm
             verification: SwiftPM
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ matrix.flutter }}
           cache: true
@@ -230,8 +230,8 @@ jobs:
     name: Native iOS RunnerTests on simulator
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.47.7'
           cache: true
